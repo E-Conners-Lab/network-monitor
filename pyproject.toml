@@ -1,0 +1,86 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "network-monitor"
+version = "0.1.0"
+description = "Enterprise network monitoring application with automated remediation"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    # Web framework
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.6",
+
+    # Database
+    "sqlalchemy>=2.0.25",
+    "asyncpg>=0.29.0",
+    "psycopg2-binary>=2.9.9",
+    "alembic>=1.13.1",
+
+    # Task queue
+    "celery[redis]>=5.3.6",
+    "redis>=5.0.1",
+
+    # Authentication
+    "python-jose[cryptography]>=3.3.0",
+    "passlib>=1.7.4",
+    "bcrypt==4.0.1",
+
+    # Configuration
+    "pydantic[email]>=2.5.3",
+    "pydantic-settings>=2.1.0",
+
+    # Network libraries
+    "netmiko>=4.3.0",
+    "napalm>=4.1.0",
+    "pysnmp>=4.4.12,<6.0.0",
+    "pyasn1>=0.4.8,<0.6.0",
+    "ncclient>=0.6.15",
+
+    # NetBox integration
+    "pynetbox>=7.3.3",
+
+    # HTTP client for webhooks
+    "httpx>=0.26.0",
+
+    # CLI
+    "typer>=0.9.0",
+    "rich>=13.7.0",
+
+    # Utilities
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.4",
+    "pytest-asyncio>=0.23.3",
+    "pytest-cov>=4.1.0",
+    "httpx>=0.26.0",
+    "ruff>=0.1.13",
+    "mypy>=1.8.0",
+]
+
+[project.scripts]
+netmon = "src.cli.commands:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

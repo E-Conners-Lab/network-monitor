@@ -1,0 +1,174 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: netmon-postgres
+    environment:
+      POSTGRES_USER: netmon
+      POSTGRES_PASSWORD: netmon_secret
+      POSTGRES_DB: network_monitor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netmon -d network_monitor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Celery broker and caching
+  redis:
+    image: redis:7-alpine
+    container_name: netmon-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NetBox PostgreSQL (separate from app DB)
+  netbox-postgres:
+    image: postgres:16-alpine
+    container_name: netbox-postgres
+    environment:
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: netbox_secret
+      POSTGRES_DB: netbox
+    volumes:
+      - netbox_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox -d netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NetBox Redis
+  netbox-redis:
+    image: redis:7-alpine
+    container_name: netbox-redis
+    volumes:
+      - netbox_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NetBox Application
+  netbox:
+    image: netboxcommunity/netbox:v4.1-3.0.2
+    container_name: netbox
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_healthy
+    env_file:
+      - netbox.env
+    ports:
+      - "8000:8080"
+    volumes:
+      - netbox_media:/opt/netbox/netbox/media
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login/"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+
+  # Network Monitor API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: netmon-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://netmon:netmon_secret@postgres:5432/network_monitor
+      REDIS_URL: redis://redis:6379/0
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: "2cd57d3d9aa872762c4d5e3c5e567cdd23e02dbc"
+      SECRET_KEY: "change-me-in-production-use-openssl-rand-hex-32"
+      DEBUG: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8080 --reload
+
+  # Celery Worker
+  celery-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: netmon-celery-worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://netmon:netmon_secret@postgres:5432/network_monitor
+      REDIS_URL: redis://redis:6379/0
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: "2cd57d3d9aa872762c4d5e3c5e567cdd23e02dbc"
+      SECRET_KEY: "change-me-in-production-use-openssl-rand-hex-32"
+    volumes:
+      - ./src:/app/src
+    command: celery -A src.tasks worker --loglevel=info
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: netmon-celery-beat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://netmon:netmon_secret@postgres:5432/network_monitor
+      REDIS_URL: redis://redis:6379/0
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: "2cd57d3d9aa872762c4d5e3c5e567cdd23e02dbc"
+      SECRET_KEY: "change-me-in-production-use-openssl-rand-hex-32"
+    volumes:
+      - ./src:/app/src
+    command: celery -A src.tasks beat --loglevel=info
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: netmon-frontend
+    depends_on:
+      - api
+    ports:
+      - "3000:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  netbox_postgres_data:
+  netbox_redis_data:
+  netbox_media:
