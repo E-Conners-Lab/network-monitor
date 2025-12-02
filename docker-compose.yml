@@ -96,7 +96,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://netmon:netmon_secret@postgres:5432/network_monitor
       REDIS_URL: redis://redis:6379/0
       NETBOX_URL: http://netbox:8080
-      NETBOX_TOKEN: "2cd57d3d9aa872762c4d5e3c5e567cdd23e02dbc"
+      NETBOX_TOKEN: "ADD_TOKEN"
       SECRET_KEY: "change-me-in-production-use-openssl-rand-hex-32"
       DEBUG: "true"
     ports:
@@ -123,10 +123,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://netmon:netmon_secret@postgres:5432/network_monitor
       REDIS_URL: redis://redis:6379/0
       NETBOX_URL: http://netbox:8080
-      NETBOX_TOKEN: "2cd57d3d9aa872762c4d5e3c5e567cdd23e02dbc"
+      NETBOX_TOKEN: "ADD_TOKEN"
       SECRET_KEY: "change-me-in-production-use-openssl-rand-hex-32"
       SSH_USERNAME: "admin"
-      SSH_PASSWORD: "Pass2885!"
+      SSH_PASSWORD: "ADD-PASSWORD"
     volumes:
       - ./src:/app/src
     command: celery -A src.tasks worker --loglevel=info
@@ -146,7 +146,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://netmon:netmon_secret@postgres:5432/network_monitor
       REDIS_URL: redis://redis:6379/0
       NETBOX_URL: http://netbox:8080
-      NETBOX_TOKEN: "2cd57d3d9aa872762c4d5e3c5e567cdd23e02dbc"
+      NETBOX_TOKEN: "CHANGE_TOKEN"
       SECRET_KEY: "change-me-in-production-use-openssl-rand-hex-32"
     volumes:
       - ./src:/app/src
