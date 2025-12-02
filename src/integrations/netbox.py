@@ -18,6 +18,7 @@ ROLE_TO_DEVICE_TYPE = {
     "router": DeviceType.ROUTER,
     "core": DeviceType.ROUTER,  # Core routers
     "pe": DeviceType.ROUTER,  # Provider Edge routers
+    "edge": DeviceType.ROUTER,  # Edge routers
     "gateway": DeviceType.ROUTER,  # Gateway routers
     "aggregation": DeviceType.ROUTER,  # Aggregation routers
     "switch": DeviceType.SWITCH,
@@ -408,7 +409,7 @@ class NetBoxSyncService:
                     existing = result.scalar_one_or_none()
 
                     if existing:
-                        # Update existing device
+                        # Update existing device - preserve local is_active override
                         existing.name = nb_device.name
                         existing.hostname = nb_device.hostname
                         existing.ip_address = nb_device.ip_address
@@ -416,7 +417,11 @@ class NetBoxSyncService:
                         existing.vendor = nb_device.vendor
                         existing.model = nb_device.model
                         existing.location = nb_device.location
-                        existing.is_active = nb_device.status == "active"
+                        # Only activate device if NetBox says active AND device was already active locally
+                        # This preserves local "disabled" state but allows NetBox to deactivate
+                        if nb_device.status != "active":
+                            existing.is_active = False
+                        # Don't overwrite is_active=False to True - preserve local override
                         results["updated"] += 1
                     else:
                         # Check if device exists by name

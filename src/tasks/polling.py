@@ -279,8 +279,8 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
         "errors": [],
     }
 
-    # Ping check
-    ping_result = await ping_host(device.ip_address, count=3, timeout=5)
+    # Ping check - reduced count and timeout for faster detection
+    ping_result = await ping_host(device.ip_address, count=2, timeout=2)
     if ping_result.success:
         results["metrics"].append(
             {
@@ -342,7 +342,11 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
             await db.flush()
             results["alerts"].append(alert.id)
 
-    # SNMP polling
+        # Update device status and return early - skip SNMP if ping fails
+        device.is_reachable = False
+        return results
+
+    # SNMP polling - only if ping succeeded
     snmp_community = device.snmp_community or settings.snmp_community
     try:
         params = ConnectionParams(
@@ -585,60 +589,88 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
     return results
 
 
+# Maximum concurrent device polls to avoid overwhelming the network/database
+MAX_CONCURRENT_POLLS = 5
+
+
+async def poll_device_with_session(device: Device, session_factory) -> dict:
+    """Poll a single device with its own database session for concurrent execution."""
+    async with session_factory() as db:
+        try:
+            result = await poll_device_metrics(db, device)
+            await db.commit()
+            return result
+        except Exception as e:
+            logger.error(f"Error polling device {device.name}: {e}")
+            await db.rollback()
+            return {
+                "device_id": device.id,
+                "device_name": device.name,
+                "success": False,
+                "error": str(e),
+            }
+
+
 @celery_app.task(bind=True)
 def poll_all_devices(self):
-    """Poll all active devices for metrics."""
+    """Poll all active devices for metrics using parallel execution."""
     logger.info(f"Starting poll_all_devices task: {self.request.id}")
 
     async def _poll_all():
         AsyncSessionLocal = get_async_session()
+
+        # Get device list in a separate session
         async with AsyncSessionLocal() as db:
-            try:
-                # Get all active devices
-                result = await db.execute(
-                    select(Device).where(Device.is_active == True)
+            result = await db.execute(
+                select(Device).where(Device.is_active == True)
+            )
+            devices = result.scalars().all()
+
+        if not devices:
+            logger.info("No active devices to poll")
+            return {"status": "success", "devices_polled": 0, "results": []}
+
+        logger.info(f"Polling {len(devices)} active devices with max {MAX_CONCURRENT_POLLS} concurrent")
+
+        # Use semaphore to limit concurrent polls
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_POLLS)
+
+        async def poll_with_semaphore(device):
+            async with semaphore:
+                return await poll_device_with_session(device, AsyncSessionLocal)
+
+        # Poll all devices concurrently (limited by semaphore)
+        results = await asyncio.gather(
+            *[poll_with_semaphore(device) for device in devices],
+            return_exceptions=True
+        )
+
+        # Process results
+        processed_results = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(f"Exception polling device {devices[i].name}: {result}")
+                processed_results.append({
+                    "device_id": devices[i].id,
+                    "device_name": devices[i].name,
+                    "success": False,
+                    "error": str(result),
+                })
+            else:
+                processed_results.append(result)
+                logger.info(
+                    f"Polled device {result['device_name']}: success={result['success']}, "
+                    f"metrics={len(result.get('metrics', []))}, alerts={len(result.get('alerts', []))}"
                 )
-                devices = result.scalars().all()
 
-                if not devices:
-                    logger.info("No active devices to poll")
-                    return {"status": "success", "devices_polled": 0, "results": []}
-
-                results = []
-                for device in devices:
-                    try:
-                        poll_result = await poll_device_metrics(db, device)
-                        results.append(poll_result)
-                        logger.info(
-                            f"Polled device {device.name}: success={poll_result['success']}, "
-                            f"metrics={len(poll_result['metrics'])}, alerts={len(poll_result['alerts'])}"
-                        )
-                    except Exception as e:
-                        logger.error(f"Error polling device {device.name}: {e}")
-                        results.append(
-                            {
-                                "device_id": device.id,
-                                "device_name": device.name,
-                                "success": False,
-                                "error": str(e),
-                            }
-                        )
-
-                await db.commit()
-
-                return {
-                    "status": "success",
-                    "task_id": self.request.id,
-                    "devices_polled": len(devices),
-                    "successful": sum(1 for r in results if r.get("success")),
-                    "failed": sum(1 for r in results if not r.get("success")),
-                    "total_alerts": sum(len(r.get("alerts", [])) for r in results),
-                }
-
-            except Exception as e:
-                logger.error(f"poll_all_devices failed: {e}")
-                await db.rollback()
-                return {"status": "error", "error": str(e)}
+        return {
+            "status": "success",
+            "task_id": self.request.id,
+            "devices_polled": len(devices),
+            "successful": sum(1 for r in processed_results if r.get("success")),
+            "failed": sum(1 for r in processed_results if not r.get("success")),
+            "total_alerts": sum(len(r.get("alerts", [])) for r in processed_results),
+        }
 
     return run_async(_poll_all())
 

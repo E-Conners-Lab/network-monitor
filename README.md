@@ -114,9 +114,10 @@ line vty 0 4
 - Swagger UI at `/docs`
 
 ### Celery Worker
-- SNMP polling (every 30 seconds)
+- SNMP polling (every 30 seconds) with parallel execution (5 concurrent max)
 - Routing protocol polling via pyATS (every 5 minutes)
 - Alert processing
+- Fast failure detection with early exit (skips SNMP if ping fails)
 
 ### Celery Beat
 - Scheduled task orchestration
@@ -187,7 +188,7 @@ line vty 0 4
 ### NetBox Integration
 - `GET /api/devices/netbox/status` - NetBox connection status
 - `GET /api/devices/netbox/devices` - Preview devices from NetBox before sync
-- `POST /api/devices/netbox/sync` - Sync devices from NetBox
+- `POST /api/devices/netbox/sync` - Sync devices from NetBox (preserves local `is_active` overrides)
 
 ### OS Version Collection
 - `POST /api/devices/collect-os-versions` - Collect OS versions from all devices via SSH
