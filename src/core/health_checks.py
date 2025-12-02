@@ -166,6 +166,48 @@ def check_snmp(
         return {"success": False, "error": str(e)}
 
 
+def parse_os_version(version_output: str) -> Optional[str]:
+    """
+    Parse OS version from show version output.
+
+    Supports Cisco IOS, IOS-XE, and NX-OS formats.
+
+    Returns:
+        Parsed OS version string or None
+    """
+    if not version_output:
+        return None
+
+    import re
+
+    # Cisco IOS-XE: "Cisco IOS XE Software, Version 17.03.08a"
+    match = re.search(r"Cisco IOS XE Software,?\s*Version\s+([\d\.]+\w*)", version_output, re.IGNORECASE)
+    if match:
+        return f"IOS-XE {match.group(1)}"
+
+    # Cisco IOS: "Cisco IOS Software, Version 15.1(4)M"
+    match = re.search(r"Cisco IOS Software.*Version\s+([\d\.]+\([^\)]+\)\w*)", version_output, re.IGNORECASE)
+    if match:
+        return f"IOS {match.group(1)}"
+
+    # Alternative IOS format: "Version 15.1(4)M"
+    match = re.search(r"Version\s+([\d\.]+\([^\)]+\)\w*)", version_output, re.IGNORECASE)
+    if match:
+        return f"IOS {match.group(1)}"
+
+    # NX-OS: "Cisco Nexus Operating System (NX-OS) Software, Version 9.3(8)"
+    match = re.search(r"NX-OS.*Version\s+([\d\.]+\([^\)]+\))", version_output, re.IGNORECASE)
+    if match:
+        return f"NX-OS {match.group(1)}"
+
+    # Fallback: Look for any "Version X.X.X" pattern
+    match = re.search(r"Version\s+([\d\.]+\w*)", version_output, re.IGNORECASE)
+    if match:
+        return match.group(1)
+
+    return None
+
+
 def check_ssh(
     host: str,
     username: str,
@@ -179,7 +221,7 @@ def check_ssh(
     Check SSH connectivity to a device.
 
     Returns:
-        dict with success status and version info or error
+        dict with success status, version info, and parsed os_version or error
     """
     try:
         params = ConnectionParams(
@@ -201,11 +243,14 @@ def check_ssh(
             driver.disconnect()
 
             if version_result.success:
+                version_output = version_result.data[:1000] if version_result.data else None
+                os_version = parse_os_version(version_output)
                 return {
                     "success": True,
-                    "version_output": version_result.data[:500] if version_result.data else None,
+                    "version_output": version_output[:500] if version_output else None,
+                    "os_version": os_version,
                 }
-            return {"success": True, "version_output": None}
+            return {"success": True, "version_output": None, "os_version": None}
         else:
             return {"success": False, "error": result.error}
 

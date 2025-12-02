@@ -7,7 +7,7 @@ import {
   Activity,
   RefreshCw
 } from 'lucide-react';
-import { devices as devicesApi, alerts as alertsApi } from '../services/api';
+import { devices as devicesApi, alerts as alertsApi, remediation as remediationApi } from '../services/api';
 import StatsCard from '../components/StatsCard';
 import DeviceCard from '../components/DeviceCard';
 import AlertCard from '../components/AlertCard';
@@ -61,6 +61,16 @@ export default function Dashboard() {
       fetchData();
     } catch (error) {
       console.error('Failed to resolve alert:', error);
+    }
+  };
+
+  const handleAutoRemediate = async (alertId) => {
+    try {
+      await remediationApi.autoRemediate(alertId);
+      // Wait a bit then refresh
+      setTimeout(fetchData, 3000);
+    } catch (error) {
+      console.error('Failed to auto-remediate:', error);
     }
   };
 
@@ -175,6 +185,7 @@ export default function Dashboard() {
                   alert={alert}
                   onAcknowledge={handleAcknowledge}
                   onResolve={handleResolve}
+                  onAutoRemediate={handleAutoRemediate}
                 />
               ))}
             </div>

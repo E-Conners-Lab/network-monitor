@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Server, Router, Shield, Wifi, Circle } from 'lucide-react';
+import { formatLocalDateTime } from '../utils/date';
 
 const deviceIcons = {
   router: Router,
@@ -52,7 +53,7 @@ export default function DeviceCard({ device, onClick }) {
 
       {device.last_seen && (
         <p className="mt-2 text-xs text-gray-500">
-          Last seen: {new Date(device.last_seen).toLocaleString()}
+          Last seen: {formatLocalDateTime(device.last_seen)}
         </p>
       )}
     </Link>

@@ -6,11 +6,13 @@ Enterprise network monitoring application with automated remediation for Cisco d
 
 - **Real-time Device Monitoring**: Poll routers, switches, and firewalls via SNMP and SSH
 - **BGP/OSPF Routing Monitoring**: Track neighbor states, prefixes, and protocol health using pyATS/Genie
-- **Interface Metrics**: Monitor bandwidth utilization, errors, and operational status
+- **Interface Metrics**: Monitor bandwidth utilization (bps), errors, and operational status
+- **Network Validation Tests**: Run comprehensive pyATS-based tests (connectivity, BGP, OSPF, interfaces, routing tables)
 - **NetBox Integration**: Sync device inventory from NetBox DCIM
-- **Automated Alerting**: Generate alerts for device unreachability, high CPU/memory, interface errors
-- **Remediation Playbooks**: Execute automated fixes for common issues
-- **React Web Dashboard**: Modern UI with device details, metrics charts, and routing tables
+- **Automated Alerting**: Generate alerts for device unreachability, high CPU/memory, interface errors, BGP/OSPF neighbor issues
+- **Auto-Remediation**: Intelligent remediation that maps alerts to fixes (clear BGP, enable interfaces, etc.)
+- **OS Version Collection**: Automatically collect and display IOS/IOS-XE/NX-OS versions from devices
+- **React Web Dashboard**: Modern UI with device details, metrics charts, routing tables, and test results
 - **REST API**: Full-featured API with Swagger documentation
 
 ## Architecture
@@ -120,10 +122,12 @@ line vty 0 4
 - Periodic polling triggers
 
 ### Frontend (React)
-- Device dashboard with status overview
-- Device detail pages with metrics charts
-- Routing tab showing BGP/OSPF neighbors
-- Alert management
+- Device dashboard with status overview and active alerts
+- Device detail pages with metrics charts and interface traffic (bps)
+- Routing tab showing BGP/OSPF neighbors with state indicators
+- Alert management with auto-remediate buttons
+- Network Tests page for running pyATS validation suites
+- Remediation page with playbook execution and history
 
 ## API Endpoints
 
@@ -146,10 +150,27 @@ line vty 0 4
 - `GET /api/alerts` - List alerts
 - `GET /api/alerts/active` - Active alerts
 - `POST /api/alerts/{id}/acknowledge` - Acknowledge alert
+- `POST /api/alerts/{id}/resolve` - Resolve alert
+
+### Remediation
+- `GET /api/remediation/playbooks` - List available playbooks
+- `GET /api/remediation/logs` - Remediation history
+- `POST /api/remediation/alerts/{id}/auto-remediate` - Auto-remediate an alert
+- `POST /api/remediation/devices/{id}/interface/enable` - Enable interface
+- `POST /api/remediation/devices/{id}/bgp/clear` - Clear BGP neighbor
+
+### Network Tests
+- `POST /api/tests/run/quick` - Run quick health check (connectivity, BGP, OSPF)
+- `POST /api/tests/run/full` - Run full validation (+ interfaces, routing tables, paths)
+- `POST /api/tests/devices/{id}/run` - Run tests on single device
+- `GET /api/tests/status/{task_id}` - Get test results
 
 ### NetBox Integration
 - `GET /api/devices/netbox/status` - NetBox connection status
 - `POST /api/devices/netbox/sync` - Sync devices from NetBox
+
+### OS Version Collection
+- `POST /api/devices/collect-os-versions` - Collect OS versions from all devices via SSH
 
 ## Configuration
 
@@ -178,18 +199,24 @@ SSH_PASSWORD=your_password
 ## Metrics Collected
 
 ### SNMP Metrics
-- CPU Utilization
-- Memory Utilization
-- Interface In/Out Octets
+- CPU Utilization (%)
+- Memory Utilization (%)
+- Interface In/Out Octets (bytes)
+- Interface In/Out Rate (bps) - calculated from octet counters
 - Interface In/Out Errors
 - Interface Status (up/down)
+- Ping Latency (ms)
+- Ping Packet Loss (%)
 
 ### Routing Metrics (via pyATS)
-- BGP Neighbor State (established/idle)
+- BGP Neighbor State (established/idle/active)
 - BGP Prefixes Received
 - BGP Uptime
-- OSPF Neighbor State
+- OSPF Neighbor State (full/2way/down)
 - OSPF Interface/Area
+
+### Device Info (via SSH)
+- OS Version (IOS, IOS-XE, NX-OS)
 
 ## Development
 

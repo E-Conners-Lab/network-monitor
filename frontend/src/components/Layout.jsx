@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Activity,
   Wrench,
+  FlaskConical,
   LogOut,
   Wifi,
   WifiOff
@@ -16,6 +17,7 @@ const navItems = [
   { path: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { path: '/metrics', label: 'Metrics', icon: Activity },
   { path: '/remediation', label: 'Remediation', icon: Wrench },
+  { path: '/tests', label: 'Tests', icon: FlaskConical },
 ];
 
 export default function Layout({ children, isConnected, onLogout }) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Server,
   Plus,
@@ -6,7 +6,8 @@ import {
   Search,
   Download,
   Play,
-  X
+  X,
+  ArrowUpDown
 } from 'lucide-react';
 import { devices as devicesApi } from '../services/api';
 import DeviceCard from '../components/DeviceCard';
@@ -16,6 +17,8 @@ export default function Devices() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState('asc');
   const [showAddModal, setShowAddModal] = useState(false);
   const [checking, setChecking] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -59,14 +62,54 @@ export default function Devices() {
     }
   };
 
-  const filteredDevices = devices.filter(device => {
-    const matchesSearch = device.name.toLowerCase().includes(filter.toLowerCase()) ||
-      device.ip_address.includes(filter);
-    const matchesType = !typeFilter || device.device_type === typeFilter;
-    return matchesSearch && matchesType;
-  });
+  const filteredAndSortedDevices = useMemo(() => {
+    // First filter
+    const filtered = devices.filter(device => {
+      const matchesSearch = device.name.toLowerCase().includes(filter.toLowerCase()) ||
+        device.ip_address.includes(filter);
+      const matchesType = !typeFilter || device.device_type === typeFilter;
+      return matchesSearch && matchesType;
+    });
+
+    // Then sort
+    return filtered.sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case 'name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'ip':
+          // Sort by IP address numerically
+          const ipA = a.ip_address.split('.').map(Number);
+          const ipB = b.ip_address.split('.').map(Number);
+          for (let i = 0; i < 4; i++) {
+            if (ipA[i] !== ipB[i]) {
+              comparison = ipA[i] - ipB[i];
+              break;
+            }
+          }
+          break;
+        case 'status':
+          // Sort by reachable status (reachable first)
+          comparison = (b.is_reachable ? 1 : 0) - (a.is_reachable ? 1 : 0);
+          break;
+        case 'type':
+          comparison = a.device_type.localeCompare(b.device_type);
+          break;
+        default:
+          comparison = a.name.localeCompare(b.name);
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+  }, [devices, filter, typeFilter, sortBy, sortOrder]);
 
   const deviceTypes = [...new Set(devices.map(d => d.device_type))];
+
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
 
   return (
     <div className="space-y-6">
@@ -127,6 +170,28 @@ export default function Devices() {
             </option>
           ))}
         </select>
+
+        {/* Sort Controls */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-400">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+          >
+            <option value="name">Name</option>
+            <option value="ip">IP Address</option>
+            <option value="status">Status</option>
+            <option value="type">Type</option>
+          </select>
+          <button
+            onClick={toggleSortOrder}
+            className="p-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-white hover:border-gray-600 transition-colors"
+            title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            <ArrowUpDown className={`w-4 h-4 ${sortOrder === 'desc' ? 'rotate-180' : ''} transition-transform`} />
+          </button>
+        </div>
       </div>
 
       {/* Device Grid */}
@@ -134,7 +199,7 @@ export default function Devices() {
         <div className="flex items-center justify-center h-64">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-500" />
         </div>
-      ) : filteredDevices.length === 0 ? (
+      ) : filteredAndSortedDevices.length === 0 ? (
         <div className="bg-gray-800 rounded-lg p-12 text-center border border-gray-700">
           <Server className="w-16 h-16 mx-auto text-gray-600 mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No devices found</h3>
@@ -160,7 +225,7 @@ export default function Devices() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredDevices.map(device => (
+          {filteredAndSortedDevices.map(device => (
             <DeviceCard key={device.id} device={device} />
           ))}
         </div>

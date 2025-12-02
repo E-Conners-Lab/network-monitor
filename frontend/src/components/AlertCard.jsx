@@ -1,5 +1,7 @@
-import { AlertTriangle, AlertCircle, Info, CheckCircle, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { AlertTriangle, AlertCircle, Info, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { parseUTCDate } from '../utils/date';
 
 const severityConfig = {
   critical: {
@@ -29,10 +31,22 @@ const statusConfig = {
 };
 
 export default function AlertCard({ alert, onAcknowledge, onResolve, onAutoRemediate }) {
+  const [loading, setLoading] = useState(null);
+
   const severity = severityConfig[alert.severity] || severityConfig.info;
   const status = statusConfig[alert.status] || statusConfig.active;
   const SeverityIcon = severity.icon;
   const StatusIcon = status.icon;
+
+  const handleAction = async (action, actionName) => {
+    if (!action) return;
+    setLoading(actionName);
+    try {
+      await action(alert.id);
+    } finally {
+      setLoading(null);
+    }
+  };
 
   return (
     <div className={`p-4 rounded-lg border ${severity.bg} ${severity.border}`}>
@@ -48,7 +62,7 @@ export default function AlertCard({ alert, onAcknowledge, onResolve, onAutoRemed
                 <span className="capitalize">{alert.status}</span>
               </span>
               <span>
-                {formatDistanceToNow(new Date(alert.created_at), { addSuffix: true })}
+                {formatDistanceToNow(parseUTCDate(alert.created_at), { addSuffix: true })}
               </span>
             </div>
           </div>
@@ -64,22 +78,28 @@ export default function AlertCard({ alert, onAcknowledge, onResolve, onAutoRemed
       {alert.status === 'active' && (
         <div className="mt-3 flex gap-2">
           <button
-            onClick={() => onAcknowledge?.(alert.id)}
-            className="px-3 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 rounded transition-colors"
+            onClick={() => handleAction(onAcknowledge, 'acknowledge')}
+            disabled={loading !== null}
+            className="px-3 py-1 text-xs bg-yellow-600 hover:bg-yellow-700 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
           >
-            Acknowledge
+            {loading === 'acknowledge' && <Loader2 className="w-3 h-3 animate-spin" />}
+            {loading === 'acknowledge' ? 'Working...' : 'Acknowledge'}
           </button>
           <button
-            onClick={() => onResolve?.(alert.id)}
-            className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors"
+            onClick={() => handleAction(onResolve, 'resolve')}
+            disabled={loading !== null}
+            className="px-3 py-1 text-xs bg-green-600 hover:bg-green-700 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
           >
-            Resolve
+            {loading === 'resolve' && <Loader2 className="w-3 h-3 animate-spin" />}
+            {loading === 'resolve' ? 'Working...' : 'Resolve'}
           </button>
           <button
-            onClick={() => onAutoRemediate?.(alert.id)}
-            className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded transition-colors"
+            onClick={() => handleAction(onAutoRemediate, 'remediate')}
+            disabled={loading !== null}
+            className="px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50 flex items-center gap-1"
           >
-            Auto-Remediate
+            {loading === 'remediate' && <Loader2 className="w-3 h-3 animate-spin" />}
+            {loading === 'remediate' ? 'Remediating...' : 'Auto-Remediate'}
           </button>
         </div>
       )}

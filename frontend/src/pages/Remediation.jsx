@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { devices as devicesApi, remediation as remediationApi } from '../services/api';
+import { parseUTCDate } from '../utils/date';
 
 export default function Remediation() {
   const [devices, setDevices] = useState([]);
@@ -219,7 +220,7 @@ export default function Remediation() {
                           <span className="text-sm text-gray-400">on {device?.name || `Device #${log.device_id}`}</span>
                         </div>
                         <div className="text-sm text-gray-500">
-                          {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
+                          {formatDistanceToNow(parseUTCDate(log.created_at), { addSuffix: true })}
                           {log.duration_ms && ` • ${log.duration_ms}ms`}
                         </div>
                       </div>

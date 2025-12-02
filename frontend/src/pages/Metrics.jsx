@@ -6,6 +6,7 @@ import {
   HardDrive,
   Clock
 } from 'lucide-react';
+import { parseUTCDate } from '../utils/date';
 import {
   LineChart,
   Line,
@@ -77,7 +78,7 @@ export default function Metrics() {
   const formatChartData = (data) => {
     if (!Array.isArray(data)) return [];
     return data.map(item => ({
-      time: new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: parseUTCDate(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       value: item.value,
     }));
   };

@@ -125,6 +125,8 @@ services:
       NETBOX_URL: http://netbox:8080
       NETBOX_TOKEN: "2cd57d3d9aa872762c4d5e3c5e567cdd23e02dbc"
       SECRET_KEY: "change-me-in-production-use-openssl-rand-hex-32"
+      SSH_USERNAME: "admin"
+      SSH_PASSWORD: "Pass2885!"
     volumes:
       - ./src:/app/src
     command: celery -A src.tasks worker --loglevel=info

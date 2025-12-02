@@ -43,7 +43,7 @@ def run_async(coro):
 
 
 def get_device_credentials(device: Device) -> dict:
-    """Get device credentials from NetBox or return defaults."""
+    """Get device credentials from NetBox or return defaults from config."""
     credentials = {
         "username": None,
         "password": None,
@@ -60,6 +60,12 @@ def get_device_credentials(device: Device) -> dict:
                     credentials.update(nb_creds)
         except Exception as e:
             logger.warning(f"Could not fetch credentials from NetBox: {e}")
+
+    # Fall back to default SSH credentials from config if not found in NetBox
+    if not credentials.get("username") and settings.ssh_username:
+        credentials["username"] = settings.ssh_username
+        credentials["password"] = settings.ssh_password
+        credentials["enable_password"] = settings.ssh_password
 
     return credentials
 
@@ -655,21 +661,32 @@ def auto_remediate_alert(self, alert_id: int):
                 if alert.status != AlertStatus.ACTIVE:
                     return {"status": "skipped", "reason": "Alert not active"}
 
-                # Map alert types to remediation actions
-                remediation_map = {
-                    "interface_down": ("interface_enable", alert.context.get("interface") if alert.context else None),
-                    "memory_utilization": ("clear_caches", None),
-                    "bgp_neighbor_down": ("clear_bgp", alert.context.get("neighbor") if alert.context else None),
-                }
-
+                # Determine remediation action based on alert type patterns
                 alert_type = alert.alert_type
-                if alert_type not in remediation_map:
+                action = None
+                param = None
+
+                if alert_type == "interface_down" or alert_type.startswith("interface_down_"):
+                    action = "interface_enable"
+                    param = alert.context.get("interface") if alert.context else None
+                elif alert_type == "memory_utilization":
+                    action = "clear_caches"
+                    param = None
+                elif alert_type.startswith("bgp_neighbor_"):
+                    action = "clear_bgp"
+                    param = alert.context.get("neighbor") if alert.context else None
+                elif alert_type.startswith("ospf_neighbor_"):
+                    # OSPF doesn't have a clear command like BGP, skip for now
+                    return {
+                        "status": "skipped",
+                        "reason": "OSPF neighbor issues require manual intervention",
+                    }
+
+                if action is None:
                     return {
                         "status": "skipped",
                         "reason": f"No auto-remediation configured for alert type: {alert_type}",
                     }
-
-                action, param = remediation_map[alert_type]
 
                 if action == "interface_enable" and param:
                     # Trigger interface enable task

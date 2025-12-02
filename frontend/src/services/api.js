@@ -88,4 +88,13 @@ export const remediation = {
   autoRemediate: (alertId) => api.post(`/remediation/alerts/${alertId}/auto-remediate`),
 };
 
+// Network Tests
+export const tests = {
+  runFull: () => api.post('/tests/run/full'),
+  runQuick: () => api.post('/tests/run/quick'),
+  runDevice: (deviceId, testType = 'full') =>
+    api.post(`/tests/devices/${deviceId}/run`, { test_type: testType }),
+  getStatus: (taskId) => api.get(`/tests/status/${taskId}`),
+};
+
 export default api;

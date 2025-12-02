@@ -16,8 +16,9 @@ import {
   Terminal,
   GitBranch,
 } from 'lucide-react';
-import { devices as devicesApi, metrics as metricsApi, alerts as alertsApi } from '../services/api';
+import { devices as devicesApi, metrics as metricsApi, alerts as alertsApi, remediation as remediationApi } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { parseUTCDate, formatLocalDateTime, formatLocalTime } from '../utils/date';
 
 export default function DeviceDetail() {
   const { id } = useParams();
@@ -28,6 +29,8 @@ export default function DeviceDetail() {
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedAlert, setSelectedAlert] = useState(null);
+  const [actionLoading, setActionLoading] = useState(null);
 
   const fetchDevice = async () => {
     try {
@@ -53,6 +56,43 @@ export default function DeviceDetail() {
       setDeviceAlerts(response.data || []);
     } catch (error) {
       console.error('Failed to fetch alerts:', error);
+    }
+  };
+
+  const handleAcknowledge = async (alertId) => {
+    setActionLoading(alertId);
+    try {
+      await alertsApi.acknowledge(alertId);
+      await fetchAlerts();
+    } catch (error) {
+      console.error('Failed to acknowledge alert:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleResolve = async (alertId) => {
+    setActionLoading(alertId);
+    try {
+      await alertsApi.resolve(alertId);
+      await fetchAlerts();
+    } catch (error) {
+      console.error('Failed to resolve alert:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAutoRemediate = async (alertId) => {
+    setActionLoading(alertId);
+    try {
+      await remediationApi.autoRemediate(alertId);
+      // Wait a moment for the task to start, then refresh
+      setTimeout(() => fetchAlerts(), 2000);
+    } catch (error) {
+      console.error('Failed to auto-remediate:', error);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -120,7 +160,7 @@ export default function DeviceDetail() {
     .slice(-24)
     .reverse()
     .map(m => ({
-      time: new Date(m.created_at).toLocaleTimeString(),
+      time: formatLocalTime(m.created_at),
       value: m.value,
     }));
 
@@ -129,7 +169,7 @@ export default function DeviceDetail() {
     .slice(-24)
     .reverse()
     .map(m => ({
-      time: new Date(m.created_at).toLocaleTimeString(),
+      time: formatLocalTime(m.created_at),
       value: m.value,
     }));
 
@@ -173,7 +213,7 @@ export default function DeviceDetail() {
     if (m.metadata_?.if_name) {
       interfaceNames[ifIndex] = m.metadata_.if_name;
     }
-    const metricTime = new Date(m.created_at);
+    const metricTime = parseUTCDate(m.created_at);
     if (m.metric_type === 'interface_in_rate') {
       if (!interfaceRates[ifIndex].inTime || metricTime > interfaceRates[ifIndex].inTime) {
         interfaceRates[ifIndex].in = m.value;
@@ -290,7 +330,7 @@ export default function DeviceDetail() {
               <p className="text-sm text-gray-400">Last Seen</p>
               <p className="text-white font-medium">
                 {device.last_seen
-                  ? new Date(device.last_seen).toLocaleString()
+                  ? formatLocalDateTime(device.last_seen)
                   : 'Never'}
               </p>
             </div>
@@ -609,37 +649,43 @@ export default function DeviceDetail() {
                 {deviceAlerts.map((alert) => (
                   <div
                     key={alert.id}
-                    className={`p-4 rounded-lg border ${
+                    className={`p-4 rounded-lg border cursor-pointer transition-all ${
                       alert.resolved_at
-                        ? 'bg-gray-900 border-gray-700'
+                        ? 'bg-gray-900 border-gray-700 hover:border-gray-600'
                         : alert.severity === 'critical'
-                        ? 'bg-red-900/20 border-red-800'
+                        ? 'bg-red-900/20 border-red-800 hover:border-red-600'
                         : alert.severity === 'warning'
-                        ? 'bg-yellow-900/20 border-yellow-800'
-                        : 'bg-blue-900/20 border-blue-800'
+                        ? 'bg-yellow-900/20 border-yellow-800 hover:border-yellow-600'
+                        : 'bg-blue-900/20 border-blue-800 hover:border-blue-600'
                     }`}
+                    onClick={() => setSelectedAlert(selectedAlert?.id === alert.id ? null : alert)}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-start gap-3">
                         {alert.resolved_at ? (
                           <CheckCircle className="w-5 h-5 text-green-400 mt-0.5" />
+                        ) : alert.status === 'acknowledged' ? (
+                          <Clock className="w-5 h-5 text-yellow-400 mt-0.5" />
                         ) : (
                           <XCircle className={`w-5 h-5 mt-0.5 ${
                             alert.severity === 'critical' ? 'text-red-400' :
                             alert.severity === 'warning' ? 'text-yellow-400' : 'text-blue-400'
                           }`} />
                         )}
-                        <div>
+                        <div className="flex-1">
                           <p className="text-white font-medium">{alert.title}</p>
                           <p className="text-sm text-gray-400 mt-1">{alert.message}</p>
-                          <p className="text-xs text-gray-500 mt-2">
-                            {new Date(alert.created_at).toLocaleString()}
+                          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+                            <span>{formatLocalDateTime(alert.created_at)}</span>
+                            <span className="capitalize px-2 py-0.5 rounded bg-gray-800">
+                              {alert.status}
+                            </span>
                             {alert.resolved_at && (
-                              <span className="text-green-400 ml-2">
-                                Resolved {new Date(alert.resolved_at).toLocaleString()}
+                              <span className="text-green-400">
+                                Resolved {formatLocalDateTime(alert.resolved_at)}
                               </span>
                             )}
-                          </p>
+                          </div>
                         </div>
                       </div>
                       <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -650,6 +696,87 @@ export default function DeviceDetail() {
                         {alert.severity}
                       </span>
                     </div>
+
+                    {/* Expanded Alert Detail */}
+                    {selectedAlert?.id === alert.id && (
+                      <div className="mt-4 pt-4 border-t border-gray-700" onClick={(e) => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                          <div>
+                            <span className="text-gray-500">Alert Type:</span>
+                            <span className="text-white ml-2">{alert.alert_type}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500">Alert ID:</span>
+                            <span className="text-white ml-2">#{alert.id}</span>
+                          </div>
+                          {alert.context && (
+                            <div className="col-span-2">
+                              <span className="text-gray-500">Context:</span>
+                              <pre className="text-white ml-2 mt-1 text-xs bg-gray-800 p-2 rounded overflow-x-auto">
+                                {JSON.stringify(alert.context, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                          {alert.acknowledged_by && (
+                            <div>
+                              <span className="text-gray-500">Acknowledged by:</span>
+                              <span className="text-white ml-2">{alert.acknowledged_by}</span>
+                            </div>
+                          )}
+                          {alert.resolution_notes && (
+                            <div className="col-span-2">
+                              <span className="text-gray-500">Resolution Notes:</span>
+                              <span className="text-white ml-2">{alert.resolution_notes}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Action Buttons */}
+                        {alert.status === 'active' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleAcknowledge(alert.id)}
+                              disabled={actionLoading === alert.id}
+                              className="px-3 py-1.5 text-sm bg-yellow-600 hover:bg-yellow-700 rounded transition-colors disabled:opacity-50"
+                            >
+                              {actionLoading === alert.id ? 'Working...' : 'Acknowledge'}
+                            </button>
+                            <button
+                              onClick={() => handleResolve(alert.id)}
+                              disabled={actionLoading === alert.id}
+                              className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 rounded transition-colors disabled:opacity-50"
+                            >
+                              {actionLoading === alert.id ? 'Working...' : 'Resolve'}
+                            </button>
+                            <button
+                              onClick={() => handleAutoRemediate(alert.id)}
+                              disabled={actionLoading === alert.id}
+                              className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50"
+                            >
+                              {actionLoading === alert.id ? 'Working...' : 'Auto-Remediate'}
+                            </button>
+                          </div>
+                        )}
+                        {alert.status === 'acknowledged' && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleResolve(alert.id)}
+                              disabled={actionLoading === alert.id}
+                              className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-700 rounded transition-colors disabled:opacity-50"
+                            >
+                              {actionLoading === alert.id ? 'Working...' : 'Resolve'}
+                            </button>
+                            <button
+                              onClick={() => handleAutoRemediate(alert.id)}
+                              disabled={actionLoading === alert.id}
+                              className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-700 rounded transition-colors disabled:opacity-50"
+                            >
+                              {actionLoading === alert.id ? 'Working...' : 'Auto-Remediate'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

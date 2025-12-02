@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.config import get_settings
-from src.api import devices, alerts, metrics, auth, websocket, remediation
+from src.api import devices, alerts, metrics, auth, websocket, remediation, tests
 
 
 @asynccontextmanager
@@ -47,6 +47,7 @@ app.include_router(devices.router, prefix="/api/devices", tags=["Devices"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(metrics.router, prefix="/api/metrics", tags=["Metrics"])
 app.include_router(remediation.router, prefix="/api/remediation", tags=["Remediation"])
+app.include_router(tests.router, prefix="/api", tags=["Tests"])
 app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
 
 

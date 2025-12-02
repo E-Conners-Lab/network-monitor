@@ -10,7 +10,7 @@ celery_app = Celery(
     "network_monitor",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["src.tasks.polling", "src.tasks.remediation", "src.tasks.routing"],
+    include=["src.tasks.polling", "src.tasks.remediation", "src.tasks.routing", "src.tasks.network_tests"],
 )
 
 celery_app.conf.update(

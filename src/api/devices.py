@@ -16,6 +16,7 @@ from src.models.user import User
 from src.core.health_checks import check_device_connectivity, HealthCheckService
 from src.drivers.base import DevicePlatform
 from src.integrations.netbox import NetBoxClient, NetBoxSyncService
+from src.tasks.polling import poll_all_devices
 
 router = APIRouter()
 
@@ -187,6 +188,11 @@ async def check_device_connectivity_endpoint(
     # Update device reachability status
     device.is_reachable = check_result.overall_reachable
     device.last_seen = datetime.utcnow().isoformat() if check_result.overall_reachable else device.last_seen
+
+    # Update OS version if SSH check was successful and returned version info
+    if check_result.ssh and check_result.ssh.get("success") and check_result.ssh.get("os_version"):
+        device.os_version = check_result.ssh.get("os_version")
+
     await db.flush()
 
     return ConnectivityCheckResponse(
@@ -206,69 +212,42 @@ async def check_device_connectivity_endpoint(
     )
 
 
-@router.post("/check-all", response_model=list[ConnectivityCheckResponse])
+class CheckAllResponse(BaseModel):
+    """Response for check-all endpoint."""
+    task_id: str
+    status: str
+    message: str
+
+
+@router.post("/check-all", response_model=CheckAllResponse)
 async def check_all_devices_connectivity(
-    check_request: ConnectivityCheckRequest = Body(default=ConnectivityCheckRequest()),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
-    Check connectivity for all active devices.
+    Trigger connectivity/metric polling for all active devices.
 
-    Note: This can take a while for many devices. Consider using async task for production.
+    This queues a background task and returns immediately.
+    Results will be visible in device status and metrics.
     """
     result = await db.execute(select(Device).where(Device.is_active == True))
     devices = result.scalars().all()
 
     if not devices:
-        return []
-
-    health_service = HealthCheckService()
-    device_configs = [
-        {
-            "device_id": d.id,
-            "device_name": d.name,
-            "ip_address": d.ip_address,
-            "username": check_request.username,
-            "password": check_request.password,
-            "snmp_community": check_request.snmp_community or d.snmp_community or "public",
-            "check_ping": check_request.check_ping,
-            "check_snmp": check_request.check_snmp,
-            "check_ssh": check_request.check_ssh,
-        }
-        for d in devices
-    ]
-
-    results = await health_service.check_devices(device_configs, max_concurrent=5)
-
-    # Update device statuses
-    for check_result in results:
-        device = next((d for d in devices if d.id == check_result.device_id), None)
-        if device:
-            device.is_reachable = check_result.overall_reachable
-            if check_result.overall_reachable:
-                device.last_seen = datetime.utcnow().isoformat()
-
-    await db.flush()
-
-    return [
-        ConnectivityCheckResponse(
-            device_id=r.device_id,
-            device_name=r.device_name,
-            ip_address=r.ip_address,
-            timestamp=r.timestamp,
-            ping={
-                "success": r.ping.success,
-                "latency_ms": r.ping.latency_ms,
-                "packet_loss": r.ping.packet_loss,
-                "error": r.ping.error,
-            } if r.ping else None,
-            snmp=r.snmp,
-            ssh=r.ssh,
-            overall_reachable=r.overall_reachable,
+        return CheckAllResponse(
+            task_id="",
+            status="skipped",
+            message="No active devices to check"
         )
-        for r in results
-    ]
+
+    # Queue the polling task - returns immediately
+    task = poll_all_devices.delay()
+
+    return CheckAllResponse(
+        task_id=task.id,
+        status="queued",
+        message=f"Polling task queued for {len(devices)} devices"
+    )
 
 
 # NetBox sync endpoints
@@ -325,3 +304,97 @@ async def list_netbox_devices(
         }
         for d in devices
     ]
+
+
+class CollectOsVersionsRequest(BaseModel):
+    """Request body for collecting OS versions."""
+    username: str
+    password: str
+
+
+class CollectOsVersionsResponse(BaseModel):
+    """Response for OS version collection."""
+    updated: int
+    failed: int
+    results: list[dict]
+
+
+@router.post("/collect-os-versions", response_model=CollectOsVersionsResponse)
+async def collect_os_versions(
+    request: CollectOsVersionsRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Collect OS versions from all active devices via SSH.
+
+    This connects to each device, runs 'show version', and parses the OS version.
+    The os_version field is updated for each device.
+    """
+    from src.core.health_checks import check_ssh, parse_os_version
+
+    result = await db.execute(select(Device).where(Device.is_active == True))
+    devices = result.scalars().all()
+
+    results = []
+    updated = 0
+    failed = 0
+
+    for device in devices:
+        try:
+            # Get credentials from device tags if available, otherwise use provided
+            tags = device.tags or {}
+            username = tags.get("ssh_username", request.username)
+            password = tags.get("ssh_password", request.password)
+
+            # Map device type to platform
+            platform_map = {
+                DeviceType.ROUTER: DevicePlatform.CISCO_IOS,
+                DeviceType.SWITCH: DevicePlatform.CISCO_IOS,
+                DeviceType.FIREWALL: DevicePlatform.CISCO_ASA,
+            }
+            platform = platform_map.get(device.device_type, DevicePlatform.CISCO_IOS)
+
+            ssh_result = check_ssh(
+                device.ip_address,
+                username,
+                password,
+                platform,
+                port=device.ssh_port or 22,
+                timeout=30,
+            )
+
+            if ssh_result.get("success") and ssh_result.get("os_version"):
+                device.os_version = ssh_result["os_version"]
+                updated += 1
+                results.append({
+                    "device_id": device.id,
+                    "name": device.name,
+                    "status": "updated",
+                    "os_version": ssh_result["os_version"],
+                })
+            else:
+                failed += 1
+                results.append({
+                    "device_id": device.id,
+                    "name": device.name,
+                    "status": "failed",
+                    "error": ssh_result.get("error", "Could not parse OS version"),
+                })
+
+        except Exception as e:
+            failed += 1
+            results.append({
+                "device_id": device.id,
+                "name": device.name,
+                "status": "error",
+                "error": str(e),
+            })
+
+    await db.commit()
+
+    return CollectOsVersionsResponse(
+        updated=updated,
+        failed=failed,
+        results=results,
+    )

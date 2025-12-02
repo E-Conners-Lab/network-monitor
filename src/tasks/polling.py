@@ -129,6 +129,80 @@ def calculate_rate_bps(
     return rate_bps
 
 
+async def check_interface_down_alert(
+    db: AsyncSession,
+    device_id: int,
+    if_index: str,
+    if_name: str,
+    status: str,
+    device_name: str,
+) -> Optional[Alert]:
+    """Check if interface is down and create/resolve alert accordingly.
+
+    Only creates alerts for non-management interfaces that go down.
+    """
+    # Skip management interfaces and loopbacks
+    skip_patterns = ["Loopback", "Null", "VoIP-Null", "Management", "mgmt"]
+    if any(pattern.lower() in if_name.lower() for pattern in skip_patterns):
+        return None
+
+    # Also skip interfaces that are likely not relevant (VLAN interfaces, etc.)
+    # We only care about physical interfaces like GigabitEthernet, FastEthernet, etc.
+    physical_patterns = ["GigabitEthernet", "FastEthernet", "Ethernet", "Serial", "Tunnel"]
+    is_physical = any(pattern.lower() in if_name.lower() for pattern in physical_patterns)
+    if not is_physical:
+        return None
+
+    alert_type = "interface_down"
+
+    # Check for existing active OR acknowledged alert for this interface
+    # We don't want to create duplicate alerts if user already acknowledged one
+    stmt = select(Alert).where(
+        Alert.device_id == device_id,
+        Alert.alert_type == alert_type,
+        Alert.status.in_([AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED]),
+    )
+    result = await db.execute(stmt)
+    existing_alerts = result.scalars().all()
+
+    # Find alert matching this specific interface
+    existing_alert = None
+    for alert in existing_alerts:
+        if alert.context and alert.context.get("if_index") == if_index:
+            existing_alert = alert
+            break
+
+    if status == "down":
+        if existing_alert:
+            # Alert already exists (either active or acknowledged)
+            return existing_alert
+        else:
+            # Create new interface down alert
+            alert = Alert(
+                device_id=device_id,
+                title=f"Interface Down: {if_name}",
+                message=f"Interface {if_name} on {device_name} is down",
+                severity=AlertSeverity.WARNING,
+                status=AlertStatus.ACTIVE,
+                alert_type=alert_type,
+                context={"if_index": if_index, "interface": if_name},
+            )
+            db.add(alert)
+            await db.flush()
+            logger.warning(
+                f"Alert created: Interface {if_name} down on device {device_name}"
+            )
+            return alert
+    elif status == "up" and existing_alert:
+        # Interface came back up - resolve the alert (whether it was active or acknowledged)
+        existing_alert.status = AlertStatus.RESOLVED
+        existing_alert.resolved_at = datetime.utcnow()
+        existing_alert.resolution_notes = f"Interface {if_name} is now up (auto-resolved)"
+        logger.info(f"Alert auto-resolved: Interface {if_name} on {device_name} is now up")
+
+    return None
+
+
 async def check_and_create_alert(
     db: AsyncSession,
     device_id: int,
@@ -141,11 +215,12 @@ async def check_and_create_alert(
     if not thresholds:
         return None
 
-    # Check for existing active alert
+    # Check for existing active or acknowledged alert
+    # Don't create duplicates if user already acknowledged one
     stmt = select(Alert).where(
         Alert.device_id == device_id,
         Alert.alert_type == metric_type.value,
-        Alert.status == AlertStatus.ACTIVE,
+        Alert.status.in_([AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED]),
     )
     result = await db.execute(stmt)
     existing_alert = result.scalar_one_or_none()
@@ -361,6 +436,13 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                         context=f"if_index_{if_index}",
                         metadata={"if_index": if_index, "status": status, "if_name": if_name},
                     )
+
+                    # Check for interface down alerts
+                    alert = await check_interface_down_alert(
+                        db, device.id, if_index, if_name, status, device.name
+                    )
+                    if alert:
+                        results["alerts"].append(alert.id)
 
                     # Get traffic counters for each interface
                     try:

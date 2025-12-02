@@ -7,6 +7,7 @@ import DeviceDetail from './pages/DeviceDetail';
 import Alerts from './pages/Alerts';
 import Metrics from './pages/Metrics';
 import Remediation from './pages/Remediation';
+import Tests from './pages/Tests';
 import Login from './pages/Login';
 import { auth } from './services/api';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -92,6 +93,7 @@ function App() {
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/metrics" element={<Metrics />} />
                 <Route path="/remediation" element={<Remediation />} />
+                <Route path="/tests" element={<Tests />} />
               </Routes>
             </Layout>
           </ProtectedRoute>
