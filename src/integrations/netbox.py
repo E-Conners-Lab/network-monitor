@@ -45,6 +45,14 @@ class NetBoxDevice:
     tags: list[str]
 
 
+# Map OS version prefix to NetBox platform slug
+OS_TO_PLATFORM_SLUG = {
+    "IOS-XE": "cisco-ios-xe",
+    "IOS": "cisco-ios",
+    "NX-OS": "cisco-nxos",
+}
+
+
 class NetBoxClient:
     """Client for interacting with NetBox API."""
 
@@ -199,6 +207,104 @@ class NetBoxClient:
         except Exception as e:
             logger.error(f"Error fetching credentials for device {device_id}: {e}")
             return None
+
+    def update_device_os_version(
+        self, netbox_id: int, os_version: str
+    ) -> dict:
+        """
+        Update device OS version in NetBox.
+
+        Sets the platform based on OS type and stores full version in custom field.
+
+        Args:
+            netbox_id: NetBox device ID
+            os_version: OS version string (e.g., "IOS-XE 17.03.08a")
+
+        Returns:
+            Dict with success status and details
+        """
+        if not self.is_configured:
+            return {"success": False, "error": "NetBox not configured"}
+
+        try:
+            device = self._api.dcim.devices.get(netbox_id)
+            if not device:
+                return {"success": False, "error": f"Device {netbox_id} not found"}
+
+            update_data = {}
+
+            # Set platform based on OS type prefix
+            os_type = os_version.split()[0] if os_version else None
+            if os_type and os_type in OS_TO_PLATFORM_SLUG:
+                platform_slug = OS_TO_PLATFORM_SLUG[os_type]
+                platform = self._api.dcim.platforms.get(slug=platform_slug)
+                if platform:
+                    update_data["platform"] = platform.id
+
+            # Set software_version custom field
+            update_data["custom_fields"] = {"software_version": os_version}
+
+            # Update the device
+            device.update(update_data)
+
+            return {
+                "success": True,
+                "device_name": device.name,
+                "platform": os_type,
+                "software_version": os_version,
+            }
+
+        except Exception as e:
+            logger.error(f"Error updating device {netbox_id} OS version: {e}")
+            return {"success": False, "error": str(e)}
+
+    def update_devices_os_versions(
+        self, devices: list[dict]
+    ) -> dict:
+        """
+        Bulk update OS versions for multiple devices.
+
+        Args:
+            devices: List of dicts with netbox_id and os_version
+
+        Returns:
+            Dict with success count, failed count, and details
+        """
+        if not self.is_configured:
+            return {"success": False, "error": "NetBox not configured"}
+
+        results = {"updated": 0, "failed": 0, "details": []}
+
+        for device in devices:
+            netbox_id = device.get("netbox_id")
+            os_version = device.get("os_version")
+
+            if not netbox_id or not os_version:
+                results["failed"] += 1
+                results["details"].append({
+                    "netbox_id": netbox_id,
+                    "status": "skipped",
+                    "error": "Missing netbox_id or os_version",
+                })
+                continue
+
+            result = self.update_device_os_version(netbox_id, os_version)
+            if result.get("success"):
+                results["updated"] += 1
+                results["details"].append({
+                    "netbox_id": netbox_id,
+                    "status": "updated",
+                    "os_version": os_version,
+                })
+            else:
+                results["failed"] += 1
+                results["details"].append({
+                    "netbox_id": netbox_id,
+                    "status": "failed",
+                    "error": result.get("error"),
+                })
+
+        return results
 
     def _has_primary_ip(self, device: Record) -> bool:
         """Check if device has a primary IP address."""

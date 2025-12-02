@@ -14,6 +14,7 @@ Enterprise network monitoring application with automated remediation for Cisco d
 - **OS Version Collection**: Automatically collect and display IOS/IOS-XE/NX-OS versions from devices
 - **React Web Dashboard**: Modern UI with device details, metrics charts, routing tables, and test results
 - **REST API**: Full-featured API with Swagger documentation
+- **WebSocket Events**: Real-time streaming of device status, metrics, alerts, and remediation events
 
 ## Architecture
 
@@ -131,23 +132,37 @@ line vty 0 4
 
 ## API Endpoints
 
+### Health & Info
+- `GET /health` - Health check endpoint
+- `GET /` - API info and version
+
 ### Authentication
 - `POST /api/auth/token` - Login
+- `POST /api/auth/register` - Register new user
+- `POST /api/auth/refresh` - Refresh access token
 - `GET /api/auth/me` - Current user
 
 ### Devices
 - `GET /api/devices` - List devices
 - `POST /api/devices` - Create device
 - `GET /api/devices/{id}` - Get device
-- `POST /api/devices/{id}/check` - Poll device
+- `PUT /api/devices/{id}` - Update device
+- `DELETE /api/devices/{id}` - Delete device
+- `POST /api/devices/{id}/check` - Poll single device
+- `POST /api/devices/check-all` - Poll all devices (bulk operation)
 
 ### Metrics
 - `GET /api/metrics` - List metrics
+- `POST /api/metrics` - Create metric
 - `GET /api/metrics/device/{id}/latest` - Latest metrics
+- `GET /api/metrics/device/{id}/summary` - Metric summaries (min/max/avg)
 - `GET /api/metrics/device/{id}/routing` - BGP/OSPF neighbors
 
 ### Alerts
 - `GET /api/alerts` - List alerts
+- `POST /api/alerts` - Create alert
+- `GET /api/alerts/{id}` - Get single alert
+- `PUT /api/alerts/{id}` - Update alert
 - `GET /api/alerts/active` - Active alerts
 - `POST /api/alerts/{id}/acknowledge` - Acknowledge alert
 - `POST /api/alerts/{id}/resolve` - Resolve alert
@@ -155,11 +170,15 @@ line vty 0 4
 ### Remediation
 - `GET /api/remediation/playbooks` - List available playbooks
 - `GET /api/remediation/logs` - Remediation history
+- `GET /api/remediation/logs/{id}` - Get specific remediation log
 - `POST /api/remediation/alerts/{id}/auto-remediate` - Auto-remediate an alert
+- `POST /api/remediation/alerts/{id}/send-webhook` - Send webhook notification for alert
 - `POST /api/remediation/devices/{id}/interface/enable` - Enable interface
 - `POST /api/remediation/devices/{id}/bgp/clear` - Clear BGP neighbor
+- `POST /api/remediation/devices/{id}/caches/clear` - Clear device caches
 
 ### Network Tests
+- `POST /api/tests/run` - Run tests with specified test_type parameter
 - `POST /api/tests/run/quick` - Run quick health check (connectivity, BGP, OSPF)
 - `POST /api/tests/run/full` - Run full validation (+ interfaces, routing tables, paths)
 - `POST /api/tests/devices/{id}/run` - Run tests on single device
@@ -167,10 +186,15 @@ line vty 0 4
 
 ### NetBox Integration
 - `GET /api/devices/netbox/status` - NetBox connection status
+- `GET /api/devices/netbox/devices` - Preview devices from NetBox before sync
 - `POST /api/devices/netbox/sync` - Sync devices from NetBox
 
 ### OS Version Collection
 - `POST /api/devices/collect-os-versions` - Collect OS versions from all devices via SSH
+- `POST /api/devices/sync-os-to-netbox` - Sync OS versions to NetBox (sets platform and software_version custom field)
+
+### WebSocket
+- `WS /ws/events` - Real-time event streaming (device status, metrics, alerts, remediation)
 
 ## Configuration
 
@@ -253,6 +277,30 @@ docker-compose logs -f
 # Specific service
 docker-compose logs -f celery-worker
 ```
+
+## EVE-NG Host Deployment
+
+The project includes traffic generation scripts for adding Linux hosts to your EVE-NG lab.
+
+See `eve-ng/hosts/README.md` for complete deployment guide.
+
+### Host Configuration
+
+| Host | Site | Edge Router | IP Address |
+|------|------|-------------|------------|
+| HOST1 | MAIN | MAIN-EDGE1 | 172.16.1.10/24 |
+| HOST2 | MAIN | MAIN-EDGE2 | 172.16.2.10/24 |
+| HOST3 | MED | MED-EDGE1 | 172.17.1.10/24 |
+| HOST4 | MED | MED-EDGE2 | 172.17.2.10/24 |
+| HOST5 | RES | RES-EDGE1 | 172.18.1.10/24 |
+| HOST6 | RES | RES-EDGE2 | 172.18.2.10/24 |
+
+### Traffic Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `host_setup.sh` | Configure host IP and test connectivity |
+| `run_all_traffic.sh` | Generate ICMP, TCP, and bandwidth traffic |
 
 ## Troubleshooting
 

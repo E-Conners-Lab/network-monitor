@@ -398,3 +398,62 @@ async def collect_os_versions(
         failed=failed,
         results=results,
     )
+
+
+class SyncOsToNetBoxResponse(BaseModel):
+    """Response for syncing OS versions to NetBox."""
+    updated: int
+    failed: int
+    skipped: int
+    details: list[dict]
+
+
+@router.post("/sync-os-to-netbox", response_model=SyncOsToNetBoxResponse)
+async def sync_os_versions_to_netbox(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Sync OS versions from local database to NetBox.
+
+    Updates the platform and software_version custom field in NetBox
+    for all devices that have a netbox_id and os_version set locally.
+    """
+    from src.integrations.netbox import NetBoxClient
+
+    # Get all devices with netbox_id and os_version
+    result = await db.execute(
+        select(Device).where(
+            Device.netbox_id.isnot(None),
+            Device.os_version.isnot(None),
+        )
+    )
+    devices = result.scalars().all()
+
+    if not devices:
+        return SyncOsToNetBoxResponse(
+            updated=0,
+            failed=0,
+            skipped=0,
+            details=[{"message": "No devices with netbox_id and os_version found"}],
+        )
+
+    # Prepare device data for NetBox update
+    device_data = [
+        {"netbox_id": d.netbox_id, "os_version": d.os_version, "name": d.name}
+        for d in devices
+    ]
+
+    # Update NetBox
+    client = NetBoxClient()
+    if not client.is_configured:
+        raise HTTPException(status_code=400, detail="NetBox not configured")
+
+    results = client.update_devices_os_versions(device_data)
+
+    return SyncOsToNetBoxResponse(
+        updated=results.get("updated", 0),
+        failed=results.get("failed", 0),
+        skipped=len(devices) - results.get("updated", 0) - results.get("failed", 0),
+        details=results.get("details", []),
+    )
