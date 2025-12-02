@@ -23,6 +23,8 @@ class MetricType(enum.Enum):
     INTERFACE_OUT_OCTETS = "interface_out_octets"
     INTERFACE_IN_ERRORS = "interface_in_errors"
     INTERFACE_OUT_ERRORS = "interface_out_errors"
+    INTERFACE_IN_RATE = "interface_in_rate"  # bits per second
+    INTERFACE_OUT_RATE = "interface_out_rate"  # bits per second
 
     # Routing metrics
     BGP_NEIGHBOR_STATE = "bgp_neighbor_state"

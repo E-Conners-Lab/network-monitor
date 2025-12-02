@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsnmp-dev \
     curl \
     iputils-ping \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy dependency files and README (required by pyproject.toml)

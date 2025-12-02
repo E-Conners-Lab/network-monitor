@@ -13,6 +13,7 @@ class DriverType(Enum):
     SNMP = "snmp"
     NETCONF = "netconf"
     REST = "rest"
+    PYATS = "pyats"
 
 
 class DevicePlatform(Enum):

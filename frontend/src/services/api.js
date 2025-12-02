@@ -71,6 +71,7 @@ export const metrics = {
     api.get('/metrics/latest', { params: { device_id: deviceId, metric_type: metricType } }),
   history: (deviceId, metricType, hours = 24) =>
     api.get('/metrics/history', { params: { device_id: deviceId, metric_type: metricType, hours } }),
+  getRouting: (deviceId) => api.get(`/metrics/device/${deviceId}/routing`),
 };
 
 // Remediation

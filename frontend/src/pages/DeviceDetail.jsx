@@ -14,6 +14,7 @@ import {
   HardDrive,
   Wifi,
   Terminal,
+  GitBranch,
 } from 'lucide-react';
 import { devices as devicesApi, metrics as metricsApi, alerts as alertsApi } from '../services/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -23,6 +24,7 @@ export default function DeviceDetail() {
   const [device, setDevice] = useState(null);
   const [deviceMetrics, setDeviceMetrics] = useState([]);
   const [deviceAlerts, setDeviceAlerts] = useState([]);
+  const [routingData, setRoutingData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
@@ -54,10 +56,19 @@ export default function DeviceDetail() {
     }
   };
 
+  const fetchRoutingData = async () => {
+    try {
+      const response = await metricsApi.getRouting(id);
+      setRoutingData(response.data);
+    } catch (error) {
+      console.error('Failed to fetch routing data:', error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchDevice(), fetchMetrics(), fetchAlerts()]);
+      await Promise.all([fetchDevice(), fetchMetrics(), fetchAlerts(), fetchRoutingData()]);
       setLoading(false);
     };
     loadData();
@@ -98,6 +109,7 @@ export default function DeviceDetail() {
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Server },
     { id: 'metrics', label: 'Metrics', icon: Activity },
+    { id: 'routing', label: 'Routing', icon: GitBranch },
     { id: 'alerts', label: 'Alerts', icon: AlertTriangle },
     { id: 'interfaces', label: 'Interfaces', icon: Network },
   ];
@@ -126,9 +138,16 @@ export default function DeviceDetail() {
     m.metric_type === 'interface_in_octets' || m.metric_type === 'interface_out_octets'
   );
 
+  // Get interface rate data (bits per second)
+  const interfaceRateMetrics = deviceMetrics.filter(m =>
+    m.metric_type === 'interface_in_rate' || m.metric_type === 'interface_out_rate'
+  );
+
   // Group by interface index and get latest values, also track interface names
   const interfaceTraffic = {};
+  const interfaceRates = {};
   const interfaceNames = {};
+
   interfaceMetrics.forEach(m => {
     const ifIndex = m.context?.replace('if_index_', '') || 'unknown';
     if (!interfaceTraffic[ifIndex]) {
@@ -142,6 +161,29 @@ export default function DeviceDetail() {
       interfaceTraffic[ifIndex].in = Math.max(interfaceTraffic[ifIndex].in, m.value);
     } else {
       interfaceTraffic[ifIndex].out = Math.max(interfaceTraffic[ifIndex].out, m.value);
+    }
+  });
+
+  // Get latest rate values for each interface
+  interfaceRateMetrics.forEach(m => {
+    const ifIndex = m.context?.replace('if_index_', '') || 'unknown';
+    if (!interfaceRates[ifIndex]) {
+      interfaceRates[ifIndex] = { in: 0, out: 0, inTime: null, outTime: null };
+    }
+    if (m.metadata_?.if_name) {
+      interfaceNames[ifIndex] = m.metadata_.if_name;
+    }
+    const metricTime = new Date(m.created_at);
+    if (m.metric_type === 'interface_in_rate') {
+      if (!interfaceRates[ifIndex].inTime || metricTime > interfaceRates[ifIndex].inTime) {
+        interfaceRates[ifIndex].in = m.value;
+        interfaceRates[ifIndex].inTime = metricTime;
+      }
+    } else {
+      if (!interfaceRates[ifIndex].outTime || metricTime > interfaceRates[ifIndex].outTime) {
+        interfaceRates[ifIndex].out = m.value;
+        interfaceRates[ifIndex].outTime = metricTime;
+      }
     }
   });
 
@@ -165,6 +207,15 @@ export default function DeviceDetail() {
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Format bits per second to human readable
+  const formatBitsPerSec = (bps) => {
+    if (bps === 0 || bps === undefined) return '0 bps';
+    const k = 1000;
+    const sizes = ['bps', 'Kbps', 'Mbps', 'Gbps'];
+    const i = Math.floor(Math.log(bps) / Math.log(k));
+    return parseFloat((bps / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
@@ -431,6 +482,124 @@ export default function DeviceDetail() {
           </div>
         )}
 
+        {activeTab === 'routing' && (
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-white">Routing Protocols</h3>
+
+            {routingData ? (
+              <div className="space-y-6">
+                {/* BGP Neighbors */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-md font-medium text-white flex items-center gap-2">
+                      <GitBranch className="w-4 h-4 text-blue-400" />
+                      BGP Neighbors
+                    </h4>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-green-400">{routingData.bgp?.up || 0} Up</span>
+                      <span className="text-red-400">{routingData.bgp?.down || 0} Down</span>
+                    </div>
+                  </div>
+
+                  {routingData.bgp?.neighbors?.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-left text-gray-400 text-sm border-b border-gray-700">
+                            <th className="pb-3 pr-4">Neighbor</th>
+                            <th className="pb-3 pr-4">Remote AS</th>
+                            <th className="pb-3 pr-4">State</th>
+                            <th className="pb-3 pr-4">VRF</th>
+                            <th className="pb-3 pr-4 text-right">Prefixes</th>
+                            <th className="pb-3">Uptime</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {routingData.bgp.neighbors.map((neighbor, idx) => (
+                            <tr key={idx} className="border-b border-gray-700/50">
+                              <td className="py-3 pr-4 text-white">{neighbor.neighbor}</td>
+                              <td className="py-3 pr-4 text-gray-300">{neighbor.remote_as}</td>
+                              <td className="py-3 pr-4">
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  neighbor.is_up
+                                    ? 'bg-green-900/50 text-green-400'
+                                    : 'bg-red-900/50 text-red-400'
+                                }`}>
+                                  {neighbor.state}
+                                </span>
+                              </td>
+                              <td className="py-3 pr-4 text-gray-400">{neighbor.vrf}</td>
+                              <td className="py-3 pr-4 text-right text-gray-300">{neighbor.prefixes_received}</td>
+                              <td className="py-3 text-gray-400">{neighbor.uptime}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm">No BGP neighbors configured</p>
+                  )}
+                </div>
+
+                {/* OSPF Neighbors */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-md font-medium text-white flex items-center gap-2">
+                      <Network className="w-4 h-4 text-purple-400" />
+                      OSPF Neighbors
+                    </h4>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-green-400">{routingData.ospf?.up || 0} Up</span>
+                      <span className="text-red-400">{routingData.ospf?.down || 0} Down</span>
+                    </div>
+                  </div>
+
+                  {routingData.ospf?.neighbors?.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="text-left text-gray-400 text-sm border-b border-gray-700">
+                            <th className="pb-3 pr-4">Neighbor ID</th>
+                            <th className="pb-3 pr-4">Interface</th>
+                            <th className="pb-3 pr-4">Address</th>
+                            <th className="pb-3">State</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {routingData.ospf.neighbors.map((neighbor, idx) => (
+                            <tr key={idx} className="border-b border-gray-700/50">
+                              <td className="py-3 pr-4 text-white">{neighbor.neighbor_id}</td>
+                              <td className="py-3 pr-4 text-gray-300">{neighbor.interface}</td>
+                              <td className="py-3 pr-4 text-gray-400">{neighbor.address}</td>
+                              <td className="py-3">
+                                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                  neighbor.is_up
+                                    ? 'bg-green-900/50 text-green-400'
+                                    : 'bg-red-900/50 text-red-400'
+                                }`}>
+                                  {neighbor.state}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-gray-400 text-sm">No OSPF neighbors configured</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-400">
+                <GitBranch className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Routing data not yet collected</p>
+                <p className="text-sm mt-1">BGP/OSPF polling runs every 5 minutes</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'alerts' && (
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">Alert History</h3>
@@ -497,50 +666,62 @@ export default function DeviceDetail() {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-white">Network Interfaces</h3>
 
-            {Object.keys(interfaceTraffic).length > 0 ? (
+            {Object.keys(interfaceTraffic).length > 0 || Object.keys(interfaceRates).length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="text-left text-gray-400 text-sm border-b border-gray-700">
                       <th className="pb-3 pr-4">Interface</th>
                       <th className="pb-3 pr-4">Status</th>
-                      <th className="pb-3 pr-4 text-right">Bytes In</th>
-                      <th className="pb-3 text-right">Bytes Out</th>
+                      <th className="pb-3 pr-4 text-right">In Rate</th>
+                      <th className="pb-3 pr-4 text-right">Out Rate</th>
+                      <th className="pb-3 pr-4 text-right">Total In</th>
+                      <th className="pb-3 text-right">Total Out</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {Object.entries(interfaceTraffic)
-                      .sort((a, b) => parseInt(a[0]) - parseInt(b[0]))
-                      .map(([ifIndex, traffic]) => (
-                        <tr key={ifIndex} className="border-b border-gray-700/50">
-                          <td className="py-3 pr-4">
-                            <div className="flex items-center gap-2">
-                              <Wifi className="w-4 h-4 text-gray-500" />
-                              <div>
-                                <span className="text-white">{interfaceNames[ifIndex] || `Interface ${ifIndex}`}</span>
-                                {interfaceNames[ifIndex] && (
-                                  <span className="text-gray-500 text-xs ml-2">(idx: {ifIndex})</span>
-                                )}
+                    {Object.keys({...interfaceTraffic, ...interfaceRates})
+                      .sort((a, b) => parseInt(a) - parseInt(b))
+                      .map((ifIndex) => {
+                        const traffic = interfaceTraffic[ifIndex] || { in: 0, out: 0 };
+                        const rates = interfaceRates[ifIndex] || { in: 0, out: 0 };
+                        return (
+                          <tr key={ifIndex} className="border-b border-gray-700/50">
+                            <td className="py-3 pr-4">
+                              <div className="flex items-center gap-2">
+                                <Wifi className="w-4 h-4 text-gray-500" />
+                                <div>
+                                  <span className="text-white">{interfaceNames[ifIndex] || `Interface ${ifIndex}`}</span>
+                                  {interfaceNames[ifIndex] && (
+                                    <span className="text-gray-500 text-xs ml-2">(idx: {ifIndex})</span>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-3 pr-4">
-                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                              interfaceStatus[ifIndex] === 'up'
-                                ? 'bg-green-900/50 text-green-400'
-                                : 'bg-red-900/50 text-red-400'
-                            }`}>
-                              {interfaceStatus[ifIndex] || 'unknown'}
-                            </span>
-                          </td>
-                          <td className="py-3 pr-4 text-right">
-                            <span className="text-green-400">{formatBytes(traffic.in)}</span>
-                          </td>
-                          <td className="py-3 text-right">
-                            <span className="text-blue-400">{formatBytes(traffic.out)}</span>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="py-3 pr-4">
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                interfaceStatus[ifIndex] === 'up'
+                                  ? 'bg-green-900/50 text-green-400'
+                                  : 'bg-red-900/50 text-red-400'
+                              }`}>
+                                {interfaceStatus[ifIndex] || 'unknown'}
+                              </span>
+                            </td>
+                            <td className="py-3 pr-4 text-right">
+                              <span className="text-green-400 font-medium">{formatBitsPerSec(rates.in)}</span>
+                            </td>
+                            <td className="py-3 pr-4 text-right">
+                              <span className="text-blue-400 font-medium">{formatBitsPerSec(rates.out)}</span>
+                            </td>
+                            <td className="py-3 pr-4 text-right">
+                              <span className="text-gray-400 text-sm">{formatBytes(traffic.in)}</span>
+                            </td>
+                            <td className="py-3 text-right">
+                              <span className="text-gray-400 text-sm">{formatBytes(traffic.out)}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
               </div>

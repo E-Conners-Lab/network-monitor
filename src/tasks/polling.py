@@ -75,6 +75,60 @@ async def store_metric(
     return metric
 
 
+async def get_previous_metric(
+    db: AsyncSession,
+    device_id: int,
+    metric_type: MetricType,
+    context: str,
+) -> Optional[Metric]:
+    """Get the most recent previous metric for rate calculation."""
+    stmt = (
+        select(Metric)
+        .where(
+            Metric.device_id == device_id,
+            Metric.metric_type == metric_type,
+            Metric.context == context,
+        )
+        .order_by(Metric.created_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+def calculate_rate_bps(
+    current_octets: float,
+    previous_octets: float,
+    current_time: datetime,
+    previous_time: datetime,
+) -> Optional[float]:
+    """Calculate traffic rate in bits per second from octet counter delta.
+
+    Handles 32-bit counter wraps (max 4,294,967,295 bytes).
+    Returns None if calculation is invalid.
+    """
+    if previous_time is None or current_time is None:
+        return None
+
+    # Calculate time delta in seconds
+    time_delta = (current_time - previous_time).total_seconds()
+    if time_delta <= 0:
+        return None
+
+    # Calculate octet delta, handling 32-bit counter wrap
+    MAX_32BIT = 4294967295
+    if current_octets >= previous_octets:
+        octet_delta = current_octets - previous_octets
+    else:
+        # Counter wrapped
+        octet_delta = (MAX_32BIT - previous_octets) + current_octets
+
+    # Convert to bits per second (octets * 8 / seconds)
+    rate_bps = (octet_delta * 8) / time_delta
+
+    return rate_bps
+
+
 async def check_and_create_alert(
     db: AsyncSession,
     device_id: int,
@@ -317,9 +371,19 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                             out_octets_raw = counters.data.get("out_octets", 0)
                             in_errors_raw = counters.data.get("in_errors", 0)
                             out_errors_raw = counters.data.get("out_errors", 0)
+                            current_time = datetime.utcnow()
+                            context_str = f"if_index_{if_index}"
 
+                            # Process IN octets and calculate rate
                             try:
                                 in_octets = float(in_octets_raw)
+
+                                # Get previous in_octets for rate calculation
+                                prev_in = await get_previous_metric(
+                                    db, device.id, MetricType.INTERFACE_IN_OCTETS, context_str
+                                )
+
+                                # Store current counter
                                 await store_metric(
                                     db,
                                     device.id,
@@ -327,14 +391,39 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                                     in_octets,
                                     f"interface_{if_index}_in_octets",
                                     unit="bytes",
-                                    context=f"if_index_{if_index}",
+                                    context=context_str,
                                     metadata={"if_name": if_name},
                                 )
+
+                                # Calculate and store rate if we have previous data
+                                if prev_in:
+                                    in_rate = calculate_rate_bps(
+                                        in_octets, prev_in.value, current_time, prev_in.created_at
+                                    )
+                                    if in_rate is not None and in_rate >= 0:
+                                        await store_metric(
+                                            db,
+                                            device.id,
+                                            MetricType.INTERFACE_IN_RATE,
+                                            in_rate,
+                                            f"interface_{if_index}_in_rate",
+                                            unit="bps",
+                                            context=context_str,
+                                            metadata={"if_name": if_name},
+                                        )
                             except (ValueError, TypeError):
                                 pass
 
+                            # Process OUT octets and calculate rate
                             try:
                                 out_octets = float(out_octets_raw)
+
+                                # Get previous out_octets for rate calculation
+                                prev_out = await get_previous_metric(
+                                    db, device.id, MetricType.INTERFACE_OUT_OCTETS, context_str
+                                )
+
+                                # Store current counter
                                 await store_metric(
                                     db,
                                     device.id,
@@ -342,9 +431,26 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                                     out_octets,
                                     f"interface_{if_index}_out_octets",
                                     unit="bytes",
-                                    context=f"if_index_{if_index}",
+                                    context=context_str,
                                     metadata={"if_name": if_name},
                                 )
+
+                                # Calculate and store rate if we have previous data
+                                if prev_out:
+                                    out_rate = calculate_rate_bps(
+                                        out_octets, prev_out.value, current_time, prev_out.created_at
+                                    )
+                                    if out_rate is not None and out_rate >= 0:
+                                        await store_metric(
+                                            db,
+                                            device.id,
+                                            MetricType.INTERFACE_OUT_RATE,
+                                            out_rate,
+                                            f"interface_{if_index}_out_rate",
+                                            unit="bps",
+                                            context=context_str,
+                                            metadata={"if_name": if_name},
+                                        )
                             except (ValueError, TypeError):
                                 pass
 
@@ -357,7 +463,7 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                                         MetricType.INTERFACE_IN_ERRORS,
                                         in_errors,
                                         f"interface_{if_index}_in_errors",
-                                        context=f"if_index_{if_index}",
+                                        context=context_str,
                                         metadata={"if_name": if_name},
                                     )
                             except (ValueError, TypeError):
@@ -372,7 +478,7 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                                         MetricType.INTERFACE_OUT_ERRORS,
                                         out_errors,
                                         f"interface_{if_index}_out_errors",
-                                        context=f"if_index_{if_index}",
+                                        context=context_str,
                                         metadata={"if_name": if_name},
                                     )
                             except (ValueError, TypeError):

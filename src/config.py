@@ -46,6 +46,10 @@ class Settings(BaseSettings):
     snmp_community: str = "public"
     snmp_version: int = 2
 
+    # SSH defaults (for pyATS/Genie routing polling)
+    ssh_username: str = ""
+    ssh_password: str = ""
+
     @property
     def sync_database_url(self) -> str:
         """Return synchronous database URL for Alembic migrations."""

@@ -40,6 +40,10 @@ dependencies = [
     "pyasn1>=0.4.8,<0.6.0",
     "ncclient>=0.6.15",
 
+    # pyATS/Genie for structured CLI parsing (BGP/OSPF)
+    "pyats[full]>=24.0",
+    "genie>=24.0",
+
     # NetBox integration
     "pynetbox>=7.3.3",
 

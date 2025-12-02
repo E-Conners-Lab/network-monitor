@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 # Map NetBox device roles to our DeviceType enum
 ROLE_TO_DEVICE_TYPE = {
     "router": DeviceType.ROUTER,
+    "core": DeviceType.ROUTER,  # Core routers
+    "pe": DeviceType.ROUTER,  # Provider Edge routers
+    "gateway": DeviceType.ROUTER,  # Gateway routers
+    "aggregation": DeviceType.ROUTER,  # Aggregation routers
     "switch": DeviceType.SWITCH,
     "firewall": DeviceType.FIREWALL,
     "access-point": DeviceType.ACCESS_POINT,
