@@ -31,6 +31,7 @@ export default function DeviceDetail() {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
+  const [showOnlyConnected, setShowOnlyConnected] = useState(true);
 
   const fetchDevice = async () => {
     try {
@@ -791,7 +792,24 @@ export default function DeviceDetail() {
 
         {activeTab === 'interfaces' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-white">Network Interfaces</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-white">Network Interfaces</h3>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <span className="text-sm text-gray-400">Show only connected</span>
+                <button
+                  onClick={() => setShowOnlyConnected(!showOnlyConnected)}
+                  className={`relative w-11 h-6 rounded-full transition-colors ${
+                    showOnlyConnected ? 'bg-blue-600' : 'bg-gray-600'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${
+                      showOnlyConnected ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </label>
+            </div>
 
             {Object.keys(interfaceTraffic).length > 0 || Object.keys(interfaceRates).length > 0 ? (
               <div className="overflow-x-auto">
@@ -808,6 +826,10 @@ export default function DeviceDetail() {
                   </thead>
                   <tbody>
                     {Object.keys({...interfaceTraffic, ...interfaceRates})
+                      .filter((ifIndex) => {
+                        if (!showOnlyConnected) return true;
+                        return interfaceStatus[ifIndex] === 'up';
+                      })
                       .sort((a, b) => parseInt(a) - parseInt(b))
                       .map((ifIndex) => {
                         const traffic = interfaceTraffic[ifIndex] || { in: 0, out: 0 };

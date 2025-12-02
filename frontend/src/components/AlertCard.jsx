@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { AlertTriangle, AlertCircle, Info, CheckCircle, Clock, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { parseUTCDate } from '../utils/date';
@@ -30,7 +30,7 @@ const statusConfig = {
   resolved: { icon: CheckCircle, text: 'text-green-400' },
 };
 
-export default function AlertCard({ alert, onAcknowledge, onResolve, onAutoRemediate }) {
+function AlertCard({ alert, onAcknowledge, onResolve, onAutoRemediate }) {
   const [loading, setLoading] = useState(null);
 
   const severity = severityConfig[alert.severity] || severityConfig.info;
@@ -106,3 +106,5 @@ export default function AlertCard({ alert, onAcknowledge, onResolve, onAutoRemed
     </div>
   );
 }
+
+export default memo(AlertCard);

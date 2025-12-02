@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
 import { Server, Router, Shield, Wifi, Circle } from 'lucide-react';
 import { formatLocalDateTime } from '../utils/date';
@@ -10,7 +11,7 @@ const deviceIcons = {
   other: Server,
 };
 
-export default function DeviceCard({ device, onClick }) {
+function DeviceCard({ device, onClick }) {
   const Icon = deviceIcons[device.device_type] || Server;
   const isReachable = device.is_reachable;
 
@@ -59,3 +60,5 @@ export default function DeviceCard({ device, onClick }) {
     </Link>
   );
 }
+
+export default memo(DeviceCard);

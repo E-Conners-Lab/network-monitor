@@ -4,8 +4,9 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from src.models.base import get_db
 from src.models.metric import Metric, MetricType
@@ -40,6 +41,111 @@ async def list_metrics(
     return result.scalars().all()
 
 
+# Map frontend metric names to enum values
+METRIC_TYPE_MAP = {
+    "cpu_utilization": MetricType.CPU_UTILIZATION,
+    "memory_utilization": MetricType.MEMORY_UTILIZATION,
+    "ping_latency": MetricType.PING_LATENCY,
+    "ping_loss": MetricType.PING_LOSS,
+    "interface_status": MetricType.INTERFACE_STATUS,
+    "interface_in_rate": MetricType.INTERFACE_IN_RATE,
+    "interface_out_rate": MetricType.INTERFACE_OUT_RATE,
+    "bgp_neighbor_state": MetricType.BGP_NEIGHBOR_STATE,
+    "ospf_neighbor_state": MetricType.OSPF_NEIGHBOR_STATE,
+}
+
+
+@router.get("/history", response_model=list[MetricResponse])
+async def get_metrics_history(
+    device_id: int,
+    metric_type: str,
+    hours: int = Query(24, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get metric history for a specific device and metric type.
+
+    This endpoint is used by the frontend Metrics dashboard to plot charts.
+    """
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+    enum_type = METRIC_TYPE_MAP.get(metric_type.lower())
+    if not enum_type:
+        return []
+
+    query = (
+        select(Metric)
+        .where(
+            Metric.device_id == device_id,
+            Metric.metric_type == enum_type,
+            Metric.created_at >= cutoff
+        )
+        .order_by(Metric.created_at.asc())  # Ascending for charts
+        .limit(1000)  # Limit data points for performance
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/history/batch", response_model=dict)
+async def get_metrics_history_batch(
+    device_id: int,
+    metric_types: str = Query(..., description="Comma-separated list of metric types"),
+    hours: int = Query(24, ge=1, le=168),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get metric history for multiple metric types in a single request.
+
+    This batch endpoint reduces N API calls to 1 for the Metrics dashboard.
+    Returns a dict with metric_type as key and list of metrics as value.
+    """
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    requested_types = [t.strip().lower() for t in metric_types.split(",")]
+
+    # Map to enum types
+    enum_types = []
+    for mt in requested_types:
+        if mt in METRIC_TYPE_MAP:
+            enum_types.append(METRIC_TYPE_MAP[mt])
+
+    if not enum_types:
+        return {}
+
+    # Single query for all metric types
+    query = (
+        select(Metric)
+        .where(
+            Metric.device_id == device_id,
+            Metric.metric_type.in_(enum_types),
+            Metric.created_at >= cutoff
+        )
+        .order_by(Metric.metric_type, Metric.created_at.asc())
+    )
+    result = await db.execute(query)
+    metrics = result.scalars().all()
+
+    # Group by metric type
+    grouped = {}
+    for metric in metrics:
+        type_name = metric.metric_type.value
+        if type_name not in grouped:
+            grouped[type_name] = []
+        grouped[type_name].append({
+            "id": metric.id,
+            "device_id": metric.device_id,
+            "metric_type": metric.metric_type,
+            "metric_name": metric.metric_name,
+            "value": metric.value,
+            "unit": metric.unit,
+            "context": metric.context,
+            "metadata_": metric.metadata_,
+            "created_at": metric.created_at,
+        })
+
+    return grouped
+
+
 @router.get("/device/{device_id}", response_model=list[MetricResponse])
 async def get_device_metrics(
     device_id: int,
@@ -68,29 +174,42 @@ async def get_device_latest_metrics(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get the latest metrics for each type for a device."""
-    # Get distinct metric types for this device
-    types_query = select(Metric.metric_type).where(Metric.device_id == device_id).distinct()
-    types_result = await db.execute(types_query)
-    metric_types = types_result.scalars().all()
+    """Get the latest metrics for each type for a device (optimized single query)."""
+    # Use a subquery to get the max created_at per metric_type
+    subq = (
+        select(
+            Metric.metric_type,
+            func.max(Metric.created_at).label("max_created")
+        )
+        .where(Metric.device_id == device_id)
+        .group_by(Metric.metric_type)
+        .subquery()
+    )
+
+    # Join to get the full metric rows for each latest
+    query = (
+        select(Metric)
+        .join(
+            subq,
+            and_(
+                Metric.device_id == device_id,
+                Metric.metric_type == subq.c.metric_type,
+                Metric.created_at == subq.c.max_created
+            )
+        )
+    )
+
+    result = await db.execute(query)
+    metrics = result.scalars().all()
 
     latest_metrics = {}
-    for mt in metric_types:
-        query = (
-            select(Metric)
-            .where(Metric.device_id == device_id, Metric.metric_type == mt)
-            .order_by(Metric.created_at.desc())
-            .limit(1)
-        )
-        result = await db.execute(query)
-        metric = result.scalar_one_or_none()
-        if metric:
-            latest_metrics[mt.value] = {
-                "value": metric.value,
-                "unit": metric.unit,
-                "context": metric.context,
-                "timestamp": metric.created_at.isoformat(),
-            }
+    for metric in metrics:
+        latest_metrics[metric.metric_type.value] = {
+            "value": metric.value,
+            "unit": metric.unit,
+            "context": metric.context,
+            "timestamp": metric.created_at.isoformat(),
+        }
 
     return {"device_id": device_id, "metrics": latest_metrics}
 
@@ -102,11 +221,11 @@ async def get_device_metrics_summary(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get metric summaries (min, max, avg) for a device."""
+    """Get metric summaries (min, max, avg) for a device (optimized single query)."""
     cutoff = datetime.utcnow() - timedelta(hours=hours)
 
     # Get summary stats grouped by metric type
-    query = (
+    summary_query = (
         select(
             Metric.metric_type,
             func.min(Metric.value).label("min_value"),
@@ -117,24 +236,42 @@ async def get_device_metrics_summary(
         .where(Metric.device_id == device_id, Metric.created_at >= cutoff)
         .group_by(Metric.metric_type)
     )
-    result = await db.execute(query)
-    summaries = []
+    summary_result = await db.execute(summary_query)
+    summary_rows = {row.metric_type: row for row in summary_result}
 
-    for row in result:
-        # Get latest value for this metric type
-        latest_query = (
-            select(Metric)
-            .where(Metric.device_id == device_id, Metric.metric_type == row.metric_type)
-            .order_by(Metric.created_at.desc())
-            .limit(1)
+    # Get all latest metrics in a single query
+    latest_subq = (
+        select(
+            Metric.metric_type,
+            func.max(Metric.created_at).label("max_created")
         )
-        latest_result = await db.execute(latest_query)
-        latest = latest_result.scalar_one_or_none()
+        .where(Metric.device_id == device_id)
+        .group_by(Metric.metric_type)
+        .subquery()
+    )
 
+    latest_query = (
+        select(Metric)
+        .join(
+            latest_subq,
+            and_(
+                Metric.device_id == device_id,
+                Metric.metric_type == latest_subq.c.metric_type,
+                Metric.created_at == latest_subq.c.max_created
+            )
+        )
+    )
+    latest_result = await db.execute(latest_query)
+    latest_metrics = {m.metric_type: m for m in latest_result.scalars().all()}
+
+    # Combine results
+    summaries = []
+    for metric_type, row in summary_rows.items():
+        latest = latest_metrics.get(metric_type)
         summaries.append(
             MetricSummary(
                 device_id=device_id,
-                metric_type=row.metric_type,
+                metric_type=metric_type,
                 min_value=row.min_value,
                 max_value=row.max_value,
                 avg_value=row.avg_value,

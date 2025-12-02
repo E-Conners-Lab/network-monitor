@@ -4,7 +4,7 @@ import enum
 from typing import Optional
 from datetime import datetime
 
-from sqlalchemy import String, ForeignKey, Enum, Text, JSON
+from sqlalchemy import String, ForeignKey, Enum, Text, JSON, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
@@ -56,6 +56,13 @@ class Alert(Base):
 
     # Relationship
     device: Mapped["Device"] = relationship("Device", back_populates="alerts")
+
+    # Indexes for efficient queries
+    __table_args__ = (
+        Index("ix_alerts_device_status", "device_id", "status"),
+        Index("ix_alerts_device_severity", "device_id", "severity"),
+        Index("ix_alerts_status_severity", "status", "severity"),
+    )
 
     def __repr__(self) -> str:
         return f"<Alert(id={self.id}, device_id={self.device_id}, severity={self.severity.value})>"

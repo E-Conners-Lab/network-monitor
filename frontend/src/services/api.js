@@ -71,6 +71,8 @@ export const metrics = {
     api.get('/metrics/latest', { params: { device_id: deviceId, metric_type: metricType } }),
   history: (deviceId, metricType, hours = 24) =>
     api.get('/metrics/history', { params: { device_id: deviceId, metric_type: metricType, hours } }),
+  historyBatch: (deviceId, metricTypes, hours = 24) =>
+    api.get('/metrics/history/batch', { params: { device_id: deviceId, metric_types: metricTypes.join(','), hours } }),
   getRouting: (deviceId) => api.get(`/metrics/device/${deviceId}/routing`),
 };
 

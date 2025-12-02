@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Server,
@@ -74,9 +74,10 @@ export default function Dashboard() {
     }
   };
 
-  const reachableCount = devices.filter(d => d.is_reachable).length;
-  const unreachableCount = devices.filter(d => !d.is_reachable).length;
-  const criticalAlerts = activeAlerts.filter(a => a.severity === 'critical').length;
+  // Memoize computed values to avoid recalculation on every render
+  const reachableCount = useMemo(() => devices.filter(d => d.is_reachable).length, [devices]);
+  const unreachableCount = useMemo(() => devices.filter(d => !d.is_reachable).length, [devices]);
+  const criticalAlerts = useMemo(() => activeAlerts.filter(a => a.severity === 'critical').length, [activeAlerts]);
 
   if (loading) {
     return (

@@ -48,6 +48,7 @@ class CiscoOIDs:
     # Interfaces
     IF_TABLE = "1.3.6.1.2.1.2.2.1"
     IF_DESCR = "1.3.6.1.2.1.2.2.1.2"
+    IF_ADMIN_STATUS = "1.3.6.1.2.1.2.2.1.7"  # 1=up, 2=down, 3=testing
     IF_OPER_STATUS = "1.3.6.1.2.1.2.2.1.8"
     IF_IN_OCTETS = "1.3.6.1.2.1.2.2.1.10"
     IF_OUT_OCTETS = "1.3.6.1.2.1.2.2.1.16"
@@ -318,6 +319,19 @@ class SNMPDriver(PollingDriver):
         if result.success:
             # Map status codes: 1=up, 2=down, 3=testing, etc.
             status_map = {1: "up", 2: "down", 3: "testing", 4: "unknown", 5: "dormant"}
+            interfaces = {}
+            for oid, status in result.data.items():
+                if_index = oid.split(".")[-1]
+                interfaces[if_index] = status_map.get(status, "unknown")
+            return DriverResult(success=True, data=interfaces)
+        return result
+
+    def get_interface_admin_status(self) -> DriverResult:
+        """Get interface administrative status (ifAdminStatus)."""
+        result = self.walk(CiscoOIDs.IF_ADMIN_STATUS)
+        if result.success:
+            # Map status codes: 1=up, 2=down, 3=testing
+            status_map = {1: "up", 2: "down", 3: "testing"}
             interfaces = {}
             for oid, status in result.data.items():
                 if_index = oid.split(".")[-1]

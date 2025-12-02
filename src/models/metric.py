@@ -66,6 +66,8 @@ class Metric(Base):
     # Indexes for efficient time-series queries
     __table_args__ = (
         Index("ix_metrics_device_type_created", "device_id", "metric_type", "created_at"),
+        Index("ix_metrics_device_created", "device_id", "created_at"),
+        Index("ix_metrics_device_context", "device_id", "metric_type", "context"),
     )
 
     def __repr__(self) -> str:

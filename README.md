@@ -10,6 +10,7 @@ Enterprise network monitoring application with automated remediation for Cisco d
 - **Network Validation Tests**: Run comprehensive pyATS-based tests (connectivity, BGP, OSPF, interfaces, routing tables)
 - **NetBox Integration**: Sync device inventory from NetBox DCIM
 - **Automated Alerting**: Generate alerts for device unreachability, high CPU/memory, interface errors, BGP/OSPF neighbor issues
+- **Smart Interface Alerts**: Automatically filters out administratively shutdown interfaces from alerts
 - **Auto-Remediation**: Intelligent remediation that maps alerts to fixes (clear BGP, enable interfaces, etc.)
 - **OS Version Collection**: Automatically collect and display IOS/IOS-XE/NX-OS versions from devices
 - **React Web Dashboard**: Modern UI with device details, metrics charts, routing tables, and test results
@@ -281,27 +282,39 @@ docker-compose logs -f celery-worker
 
 ## EVE-NG Host Deployment
 
-The project includes traffic generation scripts for adding Linux hosts to your EVE-NG lab.
-
-See `eve-ng/hosts/README.md` for complete deployment guide.
+The lab uses 6 IOSv routers as traffic generators connected to Edge routers via the STAFF-NET VRF.
 
 ### Host Configuration
 
-| Host | Site | Edge Router | IP Address |
-|------|------|-------------|------------|
-| HOST1 | MAIN | MAIN-EDGE1 | 172.16.1.10/24 |
-| HOST2 | MAIN | MAIN-EDGE2 | 172.16.2.10/24 |
-| HOST3 | MED | MED-EDGE1 | 172.17.1.10/24 |
-| HOST4 | MED | MED-EDGE2 | 172.17.2.10/24 |
-| HOST5 | RES | RES-EDGE1 | 172.18.1.10/24 |
-| HOST6 | RES | RES-EDGE2 | 172.18.2.10/24 |
+| Host | Campus | Edge Router | Edge Interface | Host IP | Gateway | Mgmt IP |
+|------|--------|-------------|----------------|---------|---------|---------|
+| HOST1 | Research | RES-EDGE1 | Gi6 | 172.18.1.10/24 | 172.18.1.1 | 192.168.68.55 |
+| HOST2 | Research | RES-EDGE2 | Gi6 | 172.18.2.10/24 | 172.18.2.1 | 192.168.68.74 |
+| HOST3 | Main | MAIN-EDGE1 | Gi4 | 172.16.1.10/24 | 172.16.1.1 | 192.168.68.77 |
+| HOST4 | Main | MAIN-EDGE2 | Gi6 | 172.16.2.10/24 | 172.16.2.1 | 192.168.68.78 |
+| HOST5 | Medical | MED-EDGE2 | Gi6 | 172.17.2.10/24 | 172.17.2.1 | 192.168.68.79 |
+| HOST6 | Medical | MED-EDGE1 | Gi6 | 172.17.1.10/24 | 172.17.1.1 | 192.168.68.80 |
 
-### Traffic Scripts
+### Deployment Scripts (in euniv-lab project)
 
 | Script | Purpose |
 |--------|---------|
-| `host_setup.sh` | Configure host IP and test connectivity |
-| `run_all_traffic.sh` | Generate ICMP, TCP, and bandwidth traffic |
+| `deploy_host_interfaces.py` | Configure Edge router interfaces in STAFF-NET VRF |
+| `deploy_host_switches.py` | Configure IOSv host routers with IP SLA probes |
+| `fix_vpnv4_rr.py` | Enable VPNv4 route-reflector-client on AGG routers |
+
+### Traffic Generation
+
+Each host router is configured with IP SLA probes that ping other hosts every 30 seconds:
+
+```
+ip sla 1
+ icmp-echo 172.18.2.10   ! Ping another campus host
+ frequency 30
+ip sla schedule 1 start-time now life forever
+```
+
+Verify traffic flow: `show ip sla statistics`
 
 ## Troubleshooting
 

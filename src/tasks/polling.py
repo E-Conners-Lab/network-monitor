@@ -20,16 +20,34 @@ from src.integrations.netbox import NetBoxSyncService
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Singleton engine and session factory for connection pooling
+_async_engine = None
+_async_session_factory = None
+
 
 def get_async_engine():
-    """Get async database engine for Celery tasks."""
-    return create_async_engine(settings.database_url, echo=settings.debug)
+    """Get singleton async database engine for Celery tasks."""
+    global _async_engine
+    if _async_engine is None:
+        _async_engine = create_async_engine(
+            settings.database_url,
+            echo=settings.debug,
+            pool_pre_ping=True,
+            pool_size=10,
+            max_overflow=20,
+        )
+    return _async_engine
 
 
 def get_async_session():
-    """Get async session factory."""
-    engine = get_async_engine()
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    """Get singleton async session factory."""
+    global _async_session_factory
+    if _async_session_factory is None:
+        engine = get_async_engine()
+        _async_session_factory = async_sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
+    return _async_session_factory
 
 
 # Alert thresholds
@@ -136,10 +154,13 @@ async def check_interface_down_alert(
     if_name: str,
     status: str,
     device_name: str,
+    admin_status: str = "up",
 ) -> Optional[Alert]:
     """Check if interface is down and create/resolve alert accordingly.
 
     Only creates alerts for non-management interfaces that go down.
+    Skips interfaces that are administratively shutdown.
+    Resolves existing alerts if interface is now admin-down.
     """
     # Skip management interfaces and loopbacks
     skip_patterns = ["Loopback", "Null", "VoIP-Null", "Management", "mgmt"]
@@ -171,6 +192,15 @@ async def check_interface_down_alert(
         if alert.context and alert.context.get("if_index") == if_index:
             existing_alert = alert
             break
+
+    # If interface is administratively shutdown, resolve any existing alert and skip
+    if admin_status == "down":
+        if existing_alert:
+            existing_alert.status = AlertStatus.RESOLVED
+            existing_alert.resolved_at = datetime.utcnow()
+            existing_alert.resolution_notes = f"Interface {if_name} was administratively shutdown (auto-resolved)"
+            logger.info(f"Alert auto-resolved: Interface {if_name} on {device_name} was admin shutdown")
+        return None
 
     if status == "down":
         if existing_alert:
@@ -357,6 +387,9 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
         snmp_driver = SNMPDriver(params)
         connect_result = snmp_driver.connect()
 
+        if not connect_result.success:
+            logger.warning(f"Device {device.name} ({device.ip_address}): SNMP connect failed: {connect_result.error}")
+
         if connect_result.success:
             # Get CPU utilization
             cpu_result = snmp_driver.get_cpu_utilization()
@@ -421,13 +454,28 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
             names_result = snmp_driver.get_interface_names()
             if names_result.success and names_result.data:
                 interface_names = names_result.data
+                logger.info(f"Device {device.name}: Found {len(interface_names)} interfaces")
+            else:
+                logger.warning(f"Device {device.name}: Failed to get interface names: {names_result.error}")
 
             # Get interface statuses
             # get_interface_status returns {if_index: status_string} like {"1": "up", "2": "down"}
             interfaces = snmp_driver.get_interface_status()
             if interfaces.success and interfaces.data:
+                logger.info(f"Device {device.name}: Got status for {len(interfaces.data)} interfaces")
+            else:
+                logger.warning(f"Device {device.name}: Failed to get interface status: {interfaces.error if interfaces else 'None'}")
+
+            # Get admin status to filter out administratively shutdown interfaces
+            admin_statuses = {}
+            admin_result = snmp_driver.get_interface_admin_status()
+            if admin_result.success and admin_result.data:
+                admin_statuses = admin_result.data
+
+            if interfaces.success and interfaces.data:
                 for if_index, status in interfaces.data.items():
                     if_name = interface_names.get(if_index, f"Interface {if_index}")
+                    admin_status = admin_statuses.get(if_index, "up")
 
                     # Store interface status (1=up, 0=down)
                     status_value = 1.0 if status == "up" else 0.0
@@ -438,12 +486,12 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                         status_value,
                         f"interface_{if_index}_status",
                         context=f"if_index_{if_index}",
-                        metadata={"if_index": if_index, "status": status, "if_name": if_name},
+                        metadata={"if_index": if_index, "status": status, "if_name": if_name, "admin_status": admin_status},
                     )
 
-                    # Check for interface down alerts
+                    # Check for interface down alerts (skip admin-shutdown interfaces)
                     alert = await check_interface_down_alert(
-                        db, device.id, if_index, if_name, status, device.name
+                        db, device.id, if_index, if_name, status, device.name, admin_status
                     )
                     if alert:
                         results["alerts"].append(alert.id)
@@ -597,7 +645,19 @@ async def poll_device_with_session(device: Device, session_factory) -> dict:
     """Poll a single device with its own database session for concurrent execution."""
     async with session_factory() as db:
         try:
-            result = await poll_device_metrics(db, device)
+            # Fetch device fresh in this session so changes are tracked
+            result = await db.execute(
+                select(Device).where(Device.id == device.id)
+            )
+            fresh_device = result.scalar_one_or_none()
+            if not fresh_device:
+                return {
+                    "device_id": device.id,
+                    "device_name": device.name,
+                    "success": False,
+                    "error": "Device not found",
+                }
+            result = await poll_device_metrics(db, fresh_device)
             await db.commit()
             return result
         except Exception as e:
