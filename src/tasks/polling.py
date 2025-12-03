@@ -348,6 +348,20 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
         )
         if alert:
             results["alerts"].append(alert.id)
+
+        # Resolve any existing device_unreachable alerts since ping succeeded
+        stmt = select(Alert).where(
+            Alert.device_id == device.id,
+            Alert.alert_type == "device_unreachable",
+            Alert.status.in_([AlertStatus.ACTIVE, AlertStatus.ACKNOWLEDGED]),
+        )
+        result = await db.execute(stmt)
+        unreachable_alerts = result.scalars().all()
+        for unreachable_alert in unreachable_alerts:
+            unreachable_alert.status = AlertStatus.RESOLVED
+            unreachable_alert.resolved_at = datetime.utcnow()
+            unreachable_alert.resolution_notes = f"Device {device.name} is now responding to ping (auto-resolved)"
+            logger.info(f"Alert auto-resolved: Device {device.name} is now reachable")
     else:
         results["errors"].append(f"Ping failed: {ping_result.error}")
         # Create unreachable alert
