@@ -99,4 +99,9 @@ export const tests = {
   getStatus: (taskId) => api.get(`/tests/status/${taskId}`),
 };
 
+// System
+export const system = {
+  version: () => api.get('/version'),
+};
+
 export default api;

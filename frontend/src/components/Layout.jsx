@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -10,6 +11,7 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
+import { system } from '../services/api';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -22,6 +24,13 @@ const navItems = [
 
 export default function Layout({ children, isConnected, onLogout }) {
   const location = useLocation();
+  const [version, setVersion] = useState(null);
+
+  useEffect(() => {
+    system.version()
+      .then(res => setVersion(res.data.version))
+      .catch(() => setVersion(null));
+  }, []);
 
   return (
     <div className="flex h-screen">
@@ -59,7 +68,7 @@ export default function Layout({ children, isConnected, onLogout }) {
         </nav>
 
         <div className="absolute bottom-0 left-0 w-64 p-4 border-t border-gray-700">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between text-sm mb-2">
             <div className="flex items-center gap-2">
               {isConnected ? (
                 <>
@@ -81,6 +90,11 @@ export default function Layout({ children, isConnected, onLogout }) {
               Logout
             </button>
           </div>
+          {version && (
+            <div className="text-xs text-gray-500 text-center">
+              v{version}
+            </div>
+          )}
         </div>
       </aside>
 

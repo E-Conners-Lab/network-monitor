@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files and README (required by pyproject.toml)
-COPY pyproject.toml README.md ./
+# Copy dependency files, VERSION, and README (required by pyproject.toml)
+COPY pyproject.toml README.md VERSION ./
 
 # Install Python dependencies (non-editable for Docker)
 RUN pip install --no-cache-dir .

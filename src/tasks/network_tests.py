@@ -60,6 +60,9 @@ def run_network_test(self, test_type: str = "full"):
             result = await db.execute(select(Device))
             devices = result.scalars().all()
 
+            # Filter out HOST devices - they are traffic generators, not network infrastructure
+            network_devices = [d for d in devices if not d.name.upper().startswith("HOST")]
+
             device_list = [
                 {
                     "id": d.id,
@@ -69,7 +72,7 @@ def run_network_test(self, test_type: str = "full"):
                     "vendor": d.vendor,
                     "device_type": d.device_type,
                 }
-                for d in devices
+                for d in network_devices
             ]
 
             # Get credentials from environment

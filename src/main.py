@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src import __version__
 from src.config import get_settings
 from src.api import devices, alerts, metrics, auth, websocket, remediation, tests
 
@@ -28,7 +29,7 @@ settings = get_settings()
 app = FastAPI(
     title=settings.app_name,
     description="Enterprise network monitoring with automated remediation",
-    version="0.1.0",
+    version=__version__,
     lifespan=lifespan,
 )
 
@@ -57,12 +58,25 @@ async def health_check():
     return {"status": "healthy", "service": settings.app_name}
 
 
+@app.get("/api/version")
+async def get_version():
+    """Version information endpoint."""
+    import platform
+    import sys
+    return {
+        "version": __version__,
+        "name": settings.app_name,
+        "python_version": sys.version.split()[0],
+        "platform": platform.system(),
+    }
+
+
 @app.get("/")
 async def root():
     """Root endpoint."""
     return {
         "name": settings.app_name,
-        "version": "0.1.0",
+        "version": __version__,
         "docs": "/docs",
         "health": "/health",
     }
