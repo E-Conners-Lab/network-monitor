@@ -3,12 +3,14 @@ import { Link, useLocation } from 'react-router-dom';
 import {
   Box,
   Flex,
-  VStack,
   HStack,
   Text,
-  Button,
+  IconButton,
   Icon,
-  useColorModeValue,
+  Badge,
+  Tooltip,
+  Container,
+  Spacer,
 } from '@chakra-ui/react';
 import {
   LayoutDashboard,
@@ -19,7 +21,8 @@ import {
   FlaskConical,
   LogOut,
   Wifi,
-  WifiOff
+  WifiOff,
+  Zap
 } from 'lucide-react';
 import { system } from '../services/api';
 
@@ -32,15 +35,17 @@ const navItems = [
   { path: '/tests', label: 'Tests', icon: FlaskConical },
 ];
 
+// Glassmorphism card style
+const glassStyle = {
+  bg: 'rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(10px)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+};
+
 export default function Layout({ children, isConnected, onLogout }) {
   const location = useLocation();
   const [version, setVersion] = useState(null);
-
-  // Chakra color mode values
-  const sidebarBg = useColorModeValue('gray.100', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.700');
-  const textColor = useColorModeValue('gray.800', 'white');
-  const mutedText = useColorModeValue('gray.600', 'gray.400');
 
   useEffect(() => {
     system.version()
@@ -49,103 +54,184 @@ export default function Layout({ children, isConnected, onLogout }) {
   }, []);
 
   return (
-    <Flex h="100vh">
-      {/* Sidebar */}
+    <Box minH="100vh" bg="transparent">
+      {/* Top Navigation Bar - Glassmorphism Style */}
       <Box
-        as="aside"
-        w="64"
-        bg={sidebarBg}
-        borderRight="1px"
-        borderColor={borderColor}
-        position="relative"
+        as="header"
+        position="fixed"
+        top={4}
+        left={4}
+        right={4}
+        zIndex={100}
+        {...glassStyle}
+        borderRadius="2xl"
+        px={6}
+        py={3}
       >
-        {/* Header */}
-        <Box p={4} borderBottom="1px" borderColor={borderColor}>
-          <HStack spacing={2}>
-            <Icon as={Activity} boxSize={6} color="green.500" />
-            <Text fontSize="xl" fontWeight="bold" color={textColor}>
-              Network Monitor
-            </Text>
+        <Flex align="center">
+          {/* Logo */}
+          <HStack spacing={3}>
+            <Box
+              p={2}
+              borderRadius="xl"
+              bg="linear-gradient(135deg, #e94560 0%, #7b2cbf 100%)"
+              boxShadow="0 4px 15px rgba(233, 69, 96, 0.4)"
+            >
+              <Icon as={Zap} boxSize={5} color="white" />
+            </Box>
+            <Box>
+              <Text fontSize="lg" fontWeight="bold" color="white" letterSpacing="tight">
+                NetMonitor
+              </Text>
+              {version && (
+                <Text fontSize="xs" color="whiteAlpha.600">
+                  v{version}
+                </Text>
+              )}
+            </Box>
           </HStack>
-        </Box>
 
-        {/* Navigation */}
-        <Box as="nav" p={4}>
-          <VStack spacing={2} align="stretch">
+          <Spacer />
+
+          {/* Navigation Pills */}
+          <HStack spacing={1} display={{ base: 'none', md: 'flex' }}>
             {navItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
-                <Button
-                  key={item.path}
-                  as={Link}
-                  to={item.path}
-                  leftIcon={<Icon as={item.icon} boxSize={5} />}
-                  justifyContent="flex-start"
-                  variant={isActive ? 'solid' : 'ghost'}
-                  colorScheme={isActive ? 'blue' : 'gray'}
-                  size="md"
-                  w="full"
-                  _hover={{
-                    bg: isActive ? undefined : 'gray.700',
-                    color: 'white',
-                  }}
-                >
-                  {item.label}
-                </Button>
+                <Tooltip key={item.path} label={item.label} placement="bottom">
+                  <Box
+                    as={Link}
+                    to={item.path}
+                    px={4}
+                    py={2}
+                    borderRadius="xl"
+                    display="flex"
+                    alignItems="center"
+                    gap={2}
+                    bg={isActive ? 'linear-gradient(135deg, #e94560 0%, #7b2cbf 100%)' : 'transparent'}
+                    color={isActive ? 'white' : 'whiteAlpha.700'}
+                    fontWeight={isActive ? 'semibold' : 'medium'}
+                    fontSize="sm"
+                    transition="all 0.3s ease"
+                    _hover={{
+                      bg: isActive ? undefined : 'whiteAlpha.100',
+                      color: 'white',
+                      transform: 'translateY(-2px)',
+                    }}
+                    boxShadow={isActive ? '0 4px 15px rgba(233, 69, 96, 0.4)' : 'none'}
+                  >
+                    <Icon as={item.icon} boxSize={4} />
+                    <Text display={{ base: 'none', lg: 'block' }}>{item.label}</Text>
+                  </Box>
+                </Tooltip>
               );
             })}
-          </VStack>
-        </Box>
+          </HStack>
 
-        {/* Footer */}
-        <Box
-          position="absolute"
-          bottom={0}
-          left={0}
-          w="full"
-          p={4}
-          borderTop="1px"
-          borderColor={borderColor}
-        >
-          <HStack justify="space-between" fontSize="sm" mb={2}>
-            <HStack spacing={2}>
-              {isConnected ? (
-                <>
-                  <Icon as={Wifi} boxSize={4} color="green.500" />
-                  <Text color="green.500">Connected</Text>
-                </>
-              ) : (
-                <>
-                  <Icon as={WifiOff} boxSize={4} color="red.500" />
-                  <Text color="red.500">Disconnected</Text>
-                </>
+          <Spacer />
+
+          {/* Status & Actions */}
+          <HStack spacing={4}>
+            {/* Connection Status */}
+            <HStack
+              spacing={2}
+              px={3}
+              py={1.5}
+              borderRadius="full"
+              bg={isConnected ? 'rgba(72, 187, 120, 0.2)' : 'rgba(245, 101, 101, 0.2)'}
+              border="1px solid"
+              borderColor={isConnected ? 'green.400' : 'red.400'}
+            >
+              <Icon
+                as={isConnected ? Wifi : WifiOff}
+                boxSize={4}
+                color={isConnected ? 'green.400' : 'red.400'}
+              />
+              <Text
+                fontSize="xs"
+                fontWeight="medium"
+                color={isConnected ? 'green.400' : 'red.400'}
+                display={{ base: 'none', md: 'block' }}
+              >
+                {isConnected ? 'Live' : 'Offline'}
+              </Text>
+              {isConnected && (
+                <Badge
+                  colorScheme="green"
+                  variant="solid"
+                  borderRadius="full"
+                  px={1.5}
+                  fontSize="2xs"
+                  animation="pulse 2s infinite"
+                >
+                  •
+                </Badge>
               )}
             </HStack>
-            <Button
-              variant="ghost"
-              size="sm"
-              leftIcon={<Icon as={LogOut} boxSize={4} />}
-              onClick={onLogout}
-              color={mutedText}
-              _hover={{ color: 'white' }}
-            >
-              Logout
-            </Button>
+
+            {/* Logout Button */}
+            <Tooltip label="Sign Out" placement="bottom">
+              <IconButton
+                icon={<Icon as={LogOut} boxSize={4} />}
+                onClick={onLogout}
+                variant="ghost"
+                borderRadius="xl"
+                color="whiteAlpha.700"
+                _hover={{
+                  bg: 'rgba(245, 101, 101, 0.2)',
+                  color: 'red.400',
+                }}
+              />
+            </Tooltip>
           </HStack>
-          {version && (
-            <Text fontSize="xs" color="gray.500" textAlign="center">
-              v{version}
-            </Text>
-          )}
-        </Box>
+        </Flex>
       </Box>
 
-      {/* Main content */}
-      <Box as="main" flex={1} overflow="auto">
-        <Box p={6}>
-          {children}
-        </Box>
+      {/* Main Content */}
+      <Box
+        as="main"
+        pt="100px"
+        pb={8}
+        px={4}
+        minH="100vh"
+      >
+        <Container maxW="container.xl">
+          <Box
+            {...glassStyle}
+            borderRadius="2xl"
+            p={6}
+            minH="calc(100vh - 140px)"
+          >
+            {children}
+          </Box>
+        </Container>
       </Box>
-    </Flex>
+
+      {/* Decorative background elements */}
+      <Box
+        position="fixed"
+        top="20%"
+        left="10%"
+        w="300px"
+        h="300px"
+        borderRadius="full"
+        bg="radial-gradient(circle, rgba(233, 69, 96, 0.15) 0%, transparent 70%)"
+        filter="blur(40px)"
+        pointerEvents="none"
+        zIndex={-1}
+      />
+      <Box
+        position="fixed"
+        bottom="20%"
+        right="10%"
+        w="400px"
+        h="400px"
+        borderRadius="full"
+        bg="radial-gradient(circle, rgba(123, 44, 191, 0.15) 0%, transparent 70%)"
+        filter="blur(40px)"
+        pointerEvents="none"
+        zIndex={-1}
+      />
+    </Box>
   );
 }
