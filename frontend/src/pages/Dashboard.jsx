@@ -18,7 +18,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async () => {
+  const fetchData = async (isRefresh = false) => {
+    const startTime = Date.now();
     try {
       const [devicesRes, alertsRes] = await Promise.all([
         devicesApi.list(),
@@ -30,7 +31,13 @@ export default function Dashboard() {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      if (isRefresh) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 500 - elapsed);
+        setTimeout(() => setRefreshing(false), remaining);
+      } else {
+        setRefreshing(false);
+      }
     }
   };
 
@@ -43,7 +50,7 @@ export default function Dashboard() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchData();
+    fetchData(true);
   };
 
   const handleAcknowledge = async (alertId) => {
@@ -98,10 +105,14 @@ export default function Dashboard() {
         <button
           onClick={handleRefresh}
           disabled={refreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            refreshing
+              ? 'bg-blue-700 cursor-wait'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
           <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 

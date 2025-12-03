@@ -92,11 +92,14 @@ export default function Topology() {
   const containerRef = useRef(null);
   const [deviceStatus, setDeviceStatus] = useState({});
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedNode, setSelectedNode] = useState(null);
   const [transform, setTransform] = useState({ k: 1, x: 0, y: 0 });
 
   // Fetch device status from API
-  const fetchDeviceStatus = useCallback(async () => {
+  const fetchDeviceStatus = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    const startTime = Date.now();
     try {
       const response = await devices.list();
       const statusMap = {};
@@ -114,6 +117,11 @@ export default function Topology() {
       console.error('Failed to fetch device status:', error);
     } finally {
       setLoading(false);
+      if (isRefresh) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 500 - elapsed);
+        setTimeout(() => setRefreshing(false), remaining);
+      }
     }
   }, []);
 
@@ -434,12 +442,12 @@ export default function Topology() {
               <Maximize2 className="w-4 h-4 text-gray-300" />
             </button>
             <button
-              onClick={fetchDeviceStatus}
-              disabled={loading}
-              className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              onClick={() => fetchDeviceStatus(true)}
+              disabled={refreshing}
+              className={`p-2 rounded-lg transition-colors ${refreshing ? 'bg-gray-600' : 'bg-gray-700 hover:bg-gray-600'}`}
               title="Refresh Status"
             >
-              <RefreshCw className={`w-4 h-4 text-gray-300 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 text-gray-300 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>

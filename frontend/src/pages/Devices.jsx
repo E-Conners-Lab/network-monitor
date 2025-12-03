@@ -40,25 +40,32 @@ export default function Devices() {
 
   const handleCheckAll = async () => {
     setChecking(true);
+    const startTime = Date.now();
     try {
       await devicesApi.checkAll();
-      setTimeout(fetchDevices, 2000); // Wait for checks to complete
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for checks to complete
+      await fetchDevices();
     } catch (error) {
       console.error('Failed to check devices:', error);
     } finally {
-      setChecking(false);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 500 - elapsed);
+      setTimeout(() => setChecking(false), remaining);
     }
   };
 
   const handleSyncNetbox = async () => {
     setSyncing(true);
+    const startTime = Date.now();
     try {
       await devicesApi.netboxSync();
       await fetchDevices();
     } catch (error) {
       console.error('Failed to sync NetBox:', error);
     } finally {
-      setSyncing(false);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 500 - elapsed);
+      setTimeout(() => setSyncing(false), remaining);
     }
   };
 
@@ -123,18 +130,26 @@ export default function Devices() {
           <button
             onClick={handleSyncNetbox}
             disabled={syncing}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors disabled:opacity-50"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+              syncing
+                ? 'bg-purple-700 cursor-wait'
+                : 'bg-purple-600 hover:bg-purple-700'
+            }`}
           >
             <Download className={`w-4 h-4 ${syncing ? 'animate-bounce' : ''}`} />
-            Sync NetBox
+            {syncing ? 'Syncing...' : 'Sync NetBox'}
           </button>
           <button
             onClick={handleCheckAll}
             disabled={checking}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors disabled:opacity-50"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+              checking
+                ? 'bg-green-700 cursor-wait'
+                : 'bg-green-600 hover:bg-green-700'
+            }`}
           >
-            <Play className={`w-4 h-4 ${checking ? 'animate-pulse' : ''}`} />
-            Check All
+            <Play className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
+            {checking ? 'Checking...' : 'Check All'}
           </button>
           <button
             onClick={() => setShowAddModal(true)}

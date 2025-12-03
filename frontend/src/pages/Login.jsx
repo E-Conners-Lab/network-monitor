@@ -15,7 +15,7 @@ export default function Login({ onLogin }) {
 
     try {
       const response = await auth.login(username, password);
-      onLogin(response.data.access_token);
+      onLogin(response.data.access_token, response.data.refresh_token);
     } catch (err) {
       setError(err.response?.data?.detail || 'Invalid credentials');
     } finally {

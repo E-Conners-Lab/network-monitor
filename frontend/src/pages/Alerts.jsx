@@ -11,10 +11,13 @@ import AlertCard from '../components/AlertCard';
 export default function Alerts() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [statusFilter, setStatusFilter] = useState('active');
   const [severityFilter, setSeverityFilter] = useState('');
 
-  const fetchAlerts = async () => {
+  const fetchAlerts = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    const startTime = Date.now();
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
@@ -26,6 +29,12 @@ export default function Alerts() {
       console.error('Failed to fetch alerts:', error);
     } finally {
       setLoading(false);
+      // Ensure minimum 500ms refresh animation so user sees feedback
+      if (isRefresh) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 500 - elapsed);
+        setTimeout(() => setRefreshing(false), remaining);
+      }
     }
   };
 
@@ -78,11 +87,16 @@ export default function Alerts() {
           </p>
         </div>
         <button
-          onClick={fetchAlerts}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          onClick={() => fetchAlerts(true)}
+          disabled={refreshing}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            refreshing
+              ? 'bg-blue-700 cursor-wait'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 

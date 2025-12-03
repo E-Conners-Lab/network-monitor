@@ -18,6 +18,7 @@ export default function Remediation() {
   const [playbooks, setPlaybooks] = useState([]);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedDevice, setSelectedDevice] = useState('');
   const [selectedPlaybook, setSelectedPlaybook] = useState('');
   const [executing, setExecuting] = useState(false);
@@ -43,12 +44,20 @@ export default function Remediation() {
     fetchData();
   }, []);
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    const startTime = Date.now();
     try {
       const res = await remediationApi.logs({ limit: 50 });
       setLogs(res.data);
     } catch (error) {
       console.error('Failed to fetch logs:', error);
+    } finally {
+      if (isRefresh) {
+        const elapsed = Date.now() - startTime;
+        const remaining = Math.max(0, 500 - elapsed);
+        setTimeout(() => setRefreshing(false), remaining);
+      }
     }
   };
 
@@ -92,11 +101,16 @@ export default function Remediation() {
           <p className="text-gray-400">Execute playbooks and view remediation history</p>
         </div>
         <button
-          onClick={fetchLogs}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          onClick={() => fetchLogs(true)}
+          disabled={refreshing}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            refreshing
+              ? 'bg-blue-700 cursor-wait'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
-          <RefreshCw className="w-4 h-4" />
-          Refresh
+          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          {refreshing ? 'Refreshing...' : 'Refresh'}
         </button>
       </div>
 

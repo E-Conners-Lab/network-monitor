@@ -117,13 +117,16 @@ export default function DeviceDetail() {
 
   const handleCheck = async () => {
     setChecking(true);
+    const startTime = Date.now();
     try {
       await devicesApi.check(id);
       await fetchDevice();
     } catch (error) {
       console.error('Health check failed:', error);
     } finally {
-      setChecking(false);
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 500 - elapsed);
+      setTimeout(() => setChecking(false), remaining);
     }
   };
 
@@ -289,10 +292,14 @@ export default function DeviceDetail() {
         <button
           onClick={handleCheck}
           disabled={checking}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50"
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
+            checking
+              ? 'bg-blue-700 cursor-wait'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
           <RefreshCw className={`w-4 h-4 ${checking ? 'animate-spin' : ''}`} />
-          Check Now
+          {checking ? 'Checking...' : 'Check Now'}
         </button>
       </div>
 

@@ -52,13 +52,17 @@ function App() {
     checkAuth();
   }, []);
 
-  const handleLogin = (token) => {
+  const handleLogin = (token, refreshToken) => {
     localStorage.setItem('token', token);
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+    }
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
     setIsAuthenticated(false);
   };
 

@@ -113,7 +113,7 @@ export default function Metrics() {
             onChange={(e) => setSelectedDevice(Number(e.target.value))}
             className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
           >
-            {devices.map(device => (
+            {[...devices].sort((a, b) => a.name.localeCompare(b.name)).map(device => (
               <option key={device.id} value={device.id}>
                 {device.name}
               </option>
