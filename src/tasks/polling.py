@@ -309,8 +309,15 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
         "errors": [],
     }
 
-    # Ping check - reduced count and timeout for faster detection
-    ping_result = await ping_host(device.ip_address, count=2, timeout=2)
+    # Ping check - use 3 pings with 3s timeout for better accuracy
+    # This balances speed with reliability (avoids false positives from single dropped packet)
+    ping_result = await ping_host(device.ip_address, count=3, timeout=3)
+
+    # Retry once if ping fails (helps with momentary network glitches)
+    if not ping_result.success:
+        await asyncio.sleep(0.5)  # Brief delay before retry
+        ping_result = await ping_host(device.ip_address, count=3, timeout=3)
+
     if ping_result.success:
         results["metrics"].append(
             {
@@ -652,7 +659,8 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
 
 
 # Maximum concurrent device polls to avoid overwhelming the network/database
-MAX_CONCURRENT_POLLS = 5
+# Increased to 10 for faster overall polling with 22 devices
+MAX_CONCURRENT_POLLS = 10
 
 
 async def poll_device_with_session(device: Device, session_factory) -> dict:
