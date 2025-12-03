@@ -15,6 +15,7 @@ Enterprise network monitoring application with automated remediation for Cisco d
 - **Auto-Remediation**: Intelligent remediation that maps alerts to fixes (clear BGP, enable interfaces, etc.)
 - **OS Version Collection**: Automatically collect and display IOS/IOS-XE/NX-OS versions from devices
 - **Version Tracking**: Single-source version management with display in API and UI sidebar
+- **Automatic Token Refresh**: Seamless session management with automatic JWT token refresh (7-day session duration)
 - **React Web Dashboard**: Modern UI with device details, metrics charts, routing tables, and test results
 - **REST API**: Full-featured API with Swagger documentation
 - **WebSocket Events**: Real-time streaming of device status, metrics, alerts, and remediation events
@@ -134,6 +135,7 @@ line vty 0 4
 - Alert management with auto-remediate buttons
 - Network Tests page for running pyATS validation suites
 - Remediation page with playbook execution and history
+- Visual feedback animations on all refresh buttons (500ms minimum display)
 
 ## API Endpoints
 
@@ -213,6 +215,8 @@ line vty 0 4
 | `NETBOX_URL` | NetBox API URL | - |
 | `NETBOX_TOKEN` | NetBox API token | - |
 | `SECRET_KEY` | JWT secret key | - |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Access token expiration | `30` |
+| `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token expiration | `7` |
 | `SNMP_COMMUNITY` | Default SNMP community | `public` |
 | `SSH_USERNAME` | Default SSH username | - |
 | `SSH_PASSWORD` | Default SSH password | - |
