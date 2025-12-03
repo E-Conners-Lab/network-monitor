@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
+  Box,
+  Flex,
+  VStack,
+  HStack,
+  Text,
+  Button,
+  Icon,
+  useColorModeValue,
+} from '@chakra-ui/react';
+import {
   LayoutDashboard,
   Server,
   AlertTriangle,
@@ -26,6 +36,12 @@ export default function Layout({ children, isConnected, onLogout }) {
   const location = useLocation();
   const [version, setVersion] = useState(null);
 
+  // Chakra color mode values
+  const sidebarBg = useColorModeValue('gray.100', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
+  const textColor = useColorModeValue('gray.800', 'white');
+  const mutedText = useColorModeValue('gray.600', 'gray.400');
+
   useEffect(() => {
     system.version()
       .then(res => setVersion(res.data.version))
@@ -33,77 +49,103 @@ export default function Layout({ children, isConnected, onLogout }) {
   }, []);
 
   return (
-    <div className="flex h-screen">
+    <Flex h="100vh">
       {/* Sidebar */}
-      <aside className="w-64 bg-gray-800 border-r border-gray-700">
-        <div className="p-4 border-b border-gray-700">
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Activity className="w-6 h-6 text-green-500" />
-            Network Monitor
-          </h1>
-        </div>
+      <Box
+        as="aside"
+        w="64"
+        bg={sidebarBg}
+        borderRight="1px"
+        borderColor={borderColor}
+        position="relative"
+      >
+        {/* Header */}
+        <Box p={4} borderBottom="1px" borderColor={borderColor}>
+          <HStack spacing={2}>
+            <Icon as={Activity} boxSize={6} color="green.500" />
+            <Text fontSize="xl" fontWeight="bold" color={textColor}>
+              Network Monitor
+            </Text>
+          </HStack>
+        </Box>
 
-        <nav className="p-4">
-          <ul className="space-y-2">
+        {/* Navigation */}
+        <Box as="nav" p={4}>
+          <VStack spacing={2} align="stretch">
             {navItems.map((item) => {
-              const Icon = item.icon;
               const isActive = location.pathname === item.path;
               return (
-                <li key={item.path}>
-                  <Link
-                    to={item.path}
-                    className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                      isActive
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    {item.label}
-                  </Link>
-                </li>
+                <Button
+                  key={item.path}
+                  as={Link}
+                  to={item.path}
+                  leftIcon={<Icon as={item.icon} boxSize={5} />}
+                  justifyContent="flex-start"
+                  variant={isActive ? 'solid' : 'ghost'}
+                  colorScheme={isActive ? 'blue' : 'gray'}
+                  size="md"
+                  w="full"
+                  _hover={{
+                    bg: isActive ? undefined : 'gray.700',
+                    color: 'white',
+                  }}
+                >
+                  {item.label}
+                </Button>
               );
             })}
-          </ul>
-        </nav>
+          </VStack>
+        </Box>
 
-        <div className="absolute bottom-0 left-0 w-64 p-4 border-t border-gray-700">
-          <div className="flex items-center justify-between text-sm mb-2">
-            <div className="flex items-center gap-2">
+        {/* Footer */}
+        <Box
+          position="absolute"
+          bottom={0}
+          left={0}
+          w="full"
+          p={4}
+          borderTop="1px"
+          borderColor={borderColor}
+        >
+          <HStack justify="space-between" fontSize="sm" mb={2}>
+            <HStack spacing={2}>
               {isConnected ? (
                 <>
-                  <Wifi className="w-4 h-4 text-green-500" />
-                  <span className="text-green-500">Connected</span>
+                  <Icon as={Wifi} boxSize={4} color="green.500" />
+                  <Text color="green.500">Connected</Text>
                 </>
               ) : (
                 <>
-                  <WifiOff className="w-4 h-4 text-red-500" />
-                  <span className="text-red-500">Disconnected</span>
+                  <Icon as={WifiOff} boxSize={4} color="red.500" />
+                  <Text color="red.500">Disconnected</Text>
                 </>
               )}
-            </div>
-            <button
+            </HStack>
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon as={LogOut} boxSize={4} />}
               onClick={onLogout}
-              className="flex items-center gap-1 text-gray-400 hover:text-white"
+              color={mutedText}
+              _hover={{ color: 'white' }}
             >
-              <LogOut className="w-4 h-4" />
               Logout
-            </button>
-          </div>
+            </Button>
+          </HStack>
           {version && (
-            <div className="text-xs text-gray-500 text-center">
+            <Text fontSize="xs" color="gray.500" textAlign="center">
               v{version}
-            </div>
+            </Text>
           )}
-        </div>
-      </aside>
+        </Box>
+      </Box>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        <div className="p-6">
+      <Box as="main" flex={1} overflow="auto">
+        <Box p={6}>
           {children}
-        </div>
-      </main>
-    </div>
+        </Box>
+      </Box>
+    </Flex>
   );
 }
