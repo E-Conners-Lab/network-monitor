@@ -13,6 +13,7 @@ Enterprise network monitoring application with automated remediation for Cisco d
 - **Smart Interface Alerts**: Automatically filters out administratively shutdown interfaces from alerts
 - **Auto-Remediation**: Intelligent remediation that maps alerts to fixes (clear BGP, enable interfaces, etc.)
 - **OS Version Collection**: Automatically collect and display IOS/IOS-XE/NX-OS versions from devices
+- **Version Tracking**: Single-source version management with display in API and UI sidebar
 - **React Web Dashboard**: Modern UI with device details, metrics charts, routing tables, and test results
 - **REST API**: Full-featured API with Swagger documentation
 - **WebSocket Events**: Real-time streaming of device status, metrics, alerts, and remediation events
@@ -137,6 +138,7 @@ line vty 0 4
 ### Health & Info
 - `GET /health` - Health check endpoint
 - `GET /` - API info and version
+- `GET /api/version` - Detailed version information (version, name, python_version, platform)
 
 ### Authentication
 - `POST /api/auth/token` - Login
