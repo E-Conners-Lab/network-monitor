@@ -7,6 +7,7 @@ Enterprise network monitoring application with automated remediation for Cisco d
 - **Real-time Device Monitoring**: Poll routers, switches, and firewalls via SNMP and SSH
 - **BGP/OSPF Routing Monitoring**: Track neighbor states, prefixes, and protocol health using pyATS/Genie
 - **Interface Metrics**: Monitor bandwidth utilization (bps), errors, and operational status
+- **Interactive Network Topology**: D3.js-powered topology map showing device connections, real-time status, and link states with zoom/pan controls
 - **Network Validation Tests**: Run comprehensive pyATS-based tests (connectivity, BGP, OSPF, interfaces, routing tables)
 - **NetBox Integration**: Sync device inventory from NetBox DCIM
 - **Automated Alerting**: Generate alerts for device unreachability, high CPU/memory, interface errors, BGP/OSPF neighbor issues
@@ -129,6 +130,7 @@ line vty 0 4
 - Device dashboard with status overview and active alerts
 - Device detail pages with metrics charts and interface traffic (bps)
 - Routing tab showing BGP/OSPF neighbors with state indicators
+- Interactive topology map with D3.js (zoom/pan, device hover tooltips, link info)
 - Alert management with auto-remediate buttons
 - Network Tests page for running pyATS validation suites
 - Remediation page with playbook execution and history

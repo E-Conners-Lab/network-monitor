@@ -5,6 +5,7 @@ import {
   Server,
   AlertTriangle,
   Activity,
+  Network,
   Wrench,
   FlaskConical,
   LogOut,
@@ -18,6 +19,7 @@ const navItems = [
   { path: '/devices', label: 'Devices', icon: Server },
   { path: '/alerts', label: 'Alerts', icon: AlertTriangle },
   { path: '/metrics', label: 'Metrics', icon: Activity },
+  { path: '/topology', label: 'Topology', icon: Network },
   { path: '/remediation', label: 'Remediation', icon: Wrench },
   { path: '/tests', label: 'Tests', icon: FlaskConical },
 ];

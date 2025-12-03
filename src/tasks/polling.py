@@ -419,27 +419,32 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                 cpu_data = cpu_result.data
                 raw_cpu = cpu_data.get("cpu_5min", cpu_data.get("cpu_1min", 0))
                 # Handle "No Such Instance" errors from unsupported OIDs
-                if raw_cpu is not None and not isinstance(raw_cpu, str):
-                    try:
-                        cpu_value = float(raw_cpu)
-                        results["metrics"].append(
-                            {"type": MetricType.CPU_UTILIZATION.value, "value": cpu_value}
-                        )
-                        await store_metric(
-                            db,
-                            device.id,
-                            MetricType.CPU_UTILIZATION,
-                            cpu_value,
-                            "cpu_utilization",
-                            unit="%",
-                        )
-                        alert = await check_and_create_alert(
-                            db, device.id, MetricType.CPU_UTILIZATION, cpu_value
-                        )
-                        if alert:
-                            results["alerts"].append(alert.id)
-                    except (ValueError, TypeError):
-                        pass  # Skip if value can't be converted
+                # Values can be numeric or string representation of numbers
+                if raw_cpu is not None:
+                    # Skip SNMP error strings like "No Such Instance..."
+                    if isinstance(raw_cpu, str) and "No Such" in raw_cpu:
+                        pass
+                    else:
+                        try:
+                            cpu_value = float(raw_cpu)
+                            results["metrics"].append(
+                                {"type": MetricType.CPU_UTILIZATION.value, "value": cpu_value}
+                            )
+                            await store_metric(
+                                db,
+                                device.id,
+                                MetricType.CPU_UTILIZATION,
+                                cpu_value,
+                                "cpu_utilization",
+                                unit="%",
+                            )
+                            alert = await check_and_create_alert(
+                                db, device.id, MetricType.CPU_UTILIZATION, cpu_value
+                            )
+                            if alert:
+                                results["alerts"].append(alert.id)
+                        except (ValueError, TypeError):
+                            pass  # Skip if value can't be converted
 
             # Get memory utilization
             memory_result = snmp_driver.get_memory_utilization()
@@ -448,27 +453,32 @@ async def poll_device_metrics(db: AsyncSession, device: Device) -> dict:
                 memory_data = memory_result.data
                 raw_memory = memory_data.get("memory_utilization", 0)
                 # Handle "No Such Instance" errors from unsupported OIDs
-                if raw_memory is not None and not isinstance(raw_memory, str):
-                    try:
-                        memory_value = float(raw_memory)
-                        results["metrics"].append(
-                            {"type": MetricType.MEMORY_UTILIZATION.value, "value": memory_value}
-                        )
-                        await store_metric(
-                            db,
-                            device.id,
-                            MetricType.MEMORY_UTILIZATION,
-                            memory_value,
-                            "memory_utilization",
-                            unit="%",
-                        )
-                        alert = await check_and_create_alert(
-                            db, device.id, MetricType.MEMORY_UTILIZATION, memory_value
-                        )
-                        if alert:
-                            results["alerts"].append(alert.id)
-                    except (ValueError, TypeError):
-                        pass  # Skip if value can't be converted
+                # Values can be numeric or string representation of numbers
+                if raw_memory is not None:
+                    # Skip SNMP error strings like "No Such Instance..."
+                    if isinstance(raw_memory, str) and "No Such" in raw_memory:
+                        pass
+                    else:
+                        try:
+                            memory_value = float(raw_memory)
+                            results["metrics"].append(
+                                {"type": MetricType.MEMORY_UTILIZATION.value, "value": memory_value}
+                            )
+                            await store_metric(
+                                db,
+                                device.id,
+                                MetricType.MEMORY_UTILIZATION,
+                                memory_value,
+                                "memory_utilization",
+                                unit="%",
+                            )
+                            alert = await check_and_create_alert(
+                                db, device.id, MetricType.MEMORY_UTILIZATION, memory_value
+                            )
+                            if alert:
+                                results["alerts"].append(alert.id)
+                        except (ValueError, TypeError):
+                            pass  # Skip if value can't be converted
 
             # Get interface names first (ifDescr) to map if_index to real names
             interface_names = {}

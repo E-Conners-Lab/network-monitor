@@ -6,6 +6,7 @@ import Devices from './pages/Devices';
 import DeviceDetail from './pages/DeviceDetail';
 import Alerts from './pages/Alerts';
 import Metrics from './pages/Metrics';
+import Topology from './pages/Topology';
 import Remediation from './pages/Remediation';
 import Tests from './pages/Tests';
 import Login from './pages/Login';
@@ -92,6 +93,7 @@ function App() {
                 <Route path="/devices/:id" element={<DeviceDetail />} />
                 <Route path="/alerts" element={<Alerts />} />
                 <Route path="/metrics" element={<Metrics />} />
+                <Route path="/topology" element={<Topology />} />
                 <Route path="/remediation" element={<Remediation />} />
                 <Route path="/tests" element={<Tests />} />
               </Routes>

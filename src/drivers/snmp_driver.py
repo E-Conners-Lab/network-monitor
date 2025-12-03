@@ -1,7 +1,7 @@
 """SNMP driver for polling device metrics."""
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from pysnmp.hlapi import (
     CommunityData,
@@ -66,6 +66,10 @@ class CiscoOIDs:
     # ASA specific
     ASA_CONN_COUNT = "1.3.6.1.4.1.9.9.147.1.2.2.2.1.5.40.6"
     ASA_FAILOVER_STATUS = "1.3.6.1.4.1.9.9.147.1.2.1.1.1.3"
+
+    # Interface status code mappings (RFC 2863)
+    IF_OPER_STATUS_MAP = {1: "up", 2: "down", 3: "testing", 4: "unknown", 5: "dormant", 6: "notPresent", 7: "lowerLayerDown"}
+    IF_ADMIN_STATUS_MAP = {1: "up", 2: "down", 3: "testing"}
 
 
 class SNMPDriver(PollingDriver):
@@ -222,7 +226,7 @@ class SNMPDriver(PollingDriver):
             logger.error(f"SNMP walk error for {self.params.host}: {e}")
             return DriverResult(success=False, error=str(e))
 
-    def _convert_value(self, value) -> any:
+    def _convert_value(self, value) -> Any:
         """Convert SNMP value to Python type."""
         if isinstance(value, Integer):
             return int(value)
@@ -258,7 +262,49 @@ class SNMPDriver(PollingDriver):
         return result
 
     def get_cpu_utilization(self) -> DriverResult:
-        """Get CPU utilization metrics."""
+        """Get CPU utilization metrics.
+
+        The CPU index varies by platform (CSR1000V uses .7, physical routers use .1).
+        We walk the CPU table to find the first valid entry.
+        """
+        # Base OIDs for CPU metrics (without index)
+        cpu_5sec_base = "1.3.6.1.4.1.9.9.109.1.1.1.1.6"
+        cpu_1min_base = "1.3.6.1.4.1.9.9.109.1.1.1.1.7"
+        cpu_5min_base = "1.3.6.1.4.1.9.9.109.1.1.1.1.8"
+
+        # Walk the 5-min CPU OID to find valid entries
+        walk_result = self.walk(cpu_5min_base)
+        if walk_result.success and walk_result.data:
+            # Get the first entry's index
+            for oid, value in walk_result.data.items():
+                # Check if value is numeric (can be string representation of number)
+                if value is not None:
+                    try:
+                        # Try to convert to int to validate it's a number
+                        int(value)
+                        # Extract the index from the OID
+                        idx = oid.split('.')[-1]
+                        # Now get all three metrics with this index
+                        oids = [
+                            f"{cpu_5sec_base}.{idx}",
+                            f"{cpu_1min_base}.{idx}",
+                            f"{cpu_5min_base}.{idx}",
+                        ]
+                        result = self.get_bulk(oids)
+                        if result.success:
+                            return DriverResult(
+                                success=True,
+                                data={
+                                    "cpu_5sec": result.data.get(f"{cpu_5sec_base}.{idx}", 0),
+                                    "cpu_1min": result.data.get(f"{cpu_1min_base}.{idx}", 0),
+                                    "cpu_5min": result.data.get(f"{cpu_5min_base}.{idx}", 0),
+                                },
+                            )
+                        break
+                    except (ValueError, TypeError):
+                        continue  # Not a valid number, try next
+
+        # Fallback to original method for backwards compatibility
         oids = [CiscoOIDs.CPU_5SEC, CiscoOIDs.CPU_1MIN, CiscoOIDs.CPU_5MIN]
         result = self.get_bulk(oids)
         if result.success:
@@ -317,12 +363,10 @@ class SNMPDriver(PollingDriver):
         """Get interface operational status."""
         result = self.walk(CiscoOIDs.IF_OPER_STATUS)
         if result.success:
-            # Map status codes: 1=up, 2=down, 3=testing, etc.
-            status_map = {1: "up", 2: "down", 3: "testing", 4: "unknown", 5: "dormant"}
             interfaces = {}
             for oid, status in result.data.items():
                 if_index = oid.split(".")[-1]
-                interfaces[if_index] = status_map.get(status, "unknown")
+                interfaces[if_index] = CiscoOIDs.IF_OPER_STATUS_MAP.get(status, "unknown")
             return DriverResult(success=True, data=interfaces)
         return result
 
@@ -330,12 +374,10 @@ class SNMPDriver(PollingDriver):
         """Get interface administrative status (ifAdminStatus)."""
         result = self.walk(CiscoOIDs.IF_ADMIN_STATUS)
         if result.success:
-            # Map status codes: 1=up, 2=down, 3=testing
-            status_map = {1: "up", 2: "down", 3: "testing"}
             interfaces = {}
             for oid, status in result.data.items():
                 if_index = oid.split(".")[-1]
-                interfaces[if_index] = status_map.get(status, "unknown")
+                interfaces[if_index] = CiscoOIDs.IF_ADMIN_STATUS_MAP.get(status, "unknown")
             return DriverResult(success=True, data=interfaces)
         return result
 
