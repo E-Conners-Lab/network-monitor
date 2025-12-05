@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src import __version__
-from src.api import alerts, auth, devices, metrics, remediation, tests, websocket
+from src.api import alerts, auth, configs, devices, metrics, remediation, tests, websocket
 from src.config import get_settings
 
 
@@ -49,6 +49,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(metrics.router, prefix="/api/metrics", tags=["Metrics"])
 app.include_router(remediation.router, prefix="/api/remediation", tags=["Remediation"])
 app.include_router(tests.router, prefix="/api", tags=["Tests"])
+app.include_router(configs.router, prefix="/api/configs", tags=["Config Backups"])
 app.include_router(websocket.router, prefix="/ws", tags=["WebSocket"])
 
 

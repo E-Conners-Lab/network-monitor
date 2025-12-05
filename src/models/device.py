@@ -61,6 +61,9 @@ class Device(Base):
     remediation_logs: Mapped[list["RemediationLog"]] = relationship(
         "RemediationLog", back_populates="device", cascade="all, delete-orphan"
     )
+    config_backups: Mapped[list["ConfigBackup"]] = relationship(
+        "ConfigBackup", back_populates="device", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Device(id={self.id}, name={self.name}, ip={self.ip_address})>"
@@ -71,5 +74,6 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.models.alert import Alert
+    from src.models.config_backup import ConfigBackup
     from src.models.metric import Metric
     from src.models.remediation_log import RemediationLog

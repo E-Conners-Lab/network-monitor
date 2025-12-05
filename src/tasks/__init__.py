@@ -10,7 +10,13 @@ celery_app = Celery(
     "network_monitor",
     broker=settings.redis_url,
     backend=settings.redis_url,
-    include=["src.tasks.polling", "src.tasks.remediation", "src.tasks.routing", "src.tasks.network_tests"],
+    include=[
+        "src.tasks.polling",
+        "src.tasks.remediation",
+        "src.tasks.routing",
+        "src.tasks.network_tests",
+        "src.tasks.config_backup",
+    ],
 )
 
 celery_app.conf.update(
@@ -42,5 +48,9 @@ celery_app.conf.beat_schedule = {
     "poll-routing-every-5-minutes": {
         "task": "src.tasks.routing.poll_routing_protocols",
         "schedule": 300.0,  # BGP/OSPF polling every 5 minutes (SSH is slow)
+    },
+    "backup-configs-daily": {
+        "task": "tasks.scheduled_config_backup",
+        "schedule": 86400.0,  # 24 hours - daily config backup
     },
 }
