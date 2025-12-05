@@ -1,9 +1,9 @@
 """Pydantic schemas for API request/response models."""
 
-from src.schemas.user import UserCreate, UserResponse, UserLogin, Token, TokenData
-from src.schemas.device import DeviceCreate, DeviceUpdate, DeviceResponse
-from src.schemas.alert import AlertCreate, AlertUpdate, AlertResponse
+from src.schemas.alert import AlertCreate, AlertResponse, AlertUpdate
+from src.schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
 from src.schemas.metric import MetricCreate, MetricResponse
+from src.schemas.user import Token, TokenData, UserCreate, UserLogin, UserResponse
 
 __all__ = [
     "UserCreate",

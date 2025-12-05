@@ -2,16 +2,14 @@
 
 import asyncio
 import logging
-import subprocess
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 from src.drivers import (
     ConnectionParams,
     DevicePlatform,
-    SSHDriver,
     SNMPDriver,
+    SSHDriver,
 )
 
 logger = logging.getLogger(__name__)
@@ -22,9 +20,9 @@ class PingResult:
     """Result of a ping check."""
 
     success: bool
-    latency_ms: Optional[float] = None
+    latency_ms: float | None = None
     packet_loss: float = 100.0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
@@ -35,10 +33,10 @@ class ConnectivityResult:
     device_name: str
     ip_address: str
     timestamp: datetime
-    ping: Optional[PingResult] = None
-    snmp: Optional[dict] = None
-    ssh: Optional[dict] = None
-    netconf: Optional[dict] = None
+    ping: PingResult | None = None
+    snmp: dict | None = None
+    ssh: dict | None = None
+    netconf: dict | None = None
     overall_reachable: bool = False
 
 
@@ -115,7 +113,7 @@ async def ping_host(host: str, count: int = 3, timeout: int = 5) -> PingResult:
                 error=f"Ping failed with return code {process.returncode}",
             )
 
-    except asyncio.TimeoutError:
+    except TimeoutError:
         return PingResult(success=False, error="Ping timed out")
     except Exception as e:
         logger.error(f"Ping error for {host}: {e}")
@@ -166,7 +164,7 @@ def check_snmp(
         return {"success": False, "error": str(e)}
 
 
-def parse_os_version(version_output: str) -> Optional[str]:
+def parse_os_version(version_output: str) -> str | None:
     """
     Parse OS version from show version output.
 
@@ -215,7 +213,7 @@ def check_ssh(
     platform: DevicePlatform = DevicePlatform.CISCO_IOS,
     port: int = 22,
     timeout: int = 30,
-    enable_password: Optional[str] = None,
+    enable_password: str | None = None,
 ) -> dict:
     """
     Check SSH connectivity to a device.
@@ -263,9 +261,9 @@ async def check_device_connectivity(
     device_id: int,
     device_name: str,
     ip_address: str,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    enable_password: Optional[str] = None,
+    username: str | None = None,
+    password: str | None = None,
+    enable_password: str | None = None,
     snmp_community: str = "public",
     platform: DevicePlatform = DevicePlatform.CISCO_IOS,
     check_ping: bool = True,

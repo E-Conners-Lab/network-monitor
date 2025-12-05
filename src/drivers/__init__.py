@@ -9,14 +9,14 @@ from src.drivers.base import (
     DriverType,
     PollingDriver,
 )
-from src.drivers.ssh_driver import SSHDriver
-from src.drivers.snmp_driver import SNMPDriver, CiscoOIDs
 from src.drivers.netconf_driver import NetconfDriver, NetconfFilters
 from src.drivers.pyats_driver import (
     PyATSDriver,
     extract_bgp_neighbor_states,
     extract_ospf_neighbor_states,
 )
+from src.drivers.snmp_driver import CiscoOIDs, SNMPDriver
+from src.drivers.ssh_driver import SSHDriver
 
 __all__ = [
     "BaseDriver",

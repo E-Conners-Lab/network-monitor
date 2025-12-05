@@ -14,14 +14,13 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
 
+from src.drivers.base import ConnectionParams, DevicePlatform
 from src.drivers.pyats_driver import (
     PyATSDriver,
     extract_bgp_neighbor_states,
     extract_ospf_neighbor_states,
 )
-from src.drivers.base import ConnectionParams, DevicePlatform
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ class TestResult:
     name: str
     status: TestStatus
     message: str
-    device: Optional[str] = None
+    device: str | None = None
     details: dict = field(default_factory=dict)
     duration_ms: float = 0
 
@@ -50,7 +49,7 @@ class TestSuiteResult:
     """Complete test suite result."""
     suite_name: str
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     total_tests: int = 0
     passed: int = 0
     failed: int = 0
@@ -135,7 +134,7 @@ class NetworkValidator:
             return DevicePlatform.CISCO_IOS_XE
         return DevicePlatform.CISCO_IOS
 
-    def _connect_device(self, device: dict) -> Optional[PyATSDriver]:
+    def _connect_device(self, device: dict) -> PyATSDriver | None:
         """Connect to a device and return driver."""
         device_name = device.get("name", device.get("ip_address"))
 

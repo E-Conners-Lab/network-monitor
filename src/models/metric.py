@@ -1,9 +1,8 @@
 """Metric model for storing device metrics."""
 
 import enum
-from typing import Optional
 
-from sqlalchemy import String, Float, ForeignKey, Enum, JSON, Index
+from sqlalchemy import JSON, Enum, Float, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
@@ -54,11 +53,11 @@ class Metric(Base):
     metric_type: Mapped[MetricType] = mapped_column(Enum(MetricType))
     metric_name: Mapped[str] = mapped_column(String(100))
     value: Mapped[float] = mapped_column(Float)
-    unit: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
     # Context (e.g., interface name, BGP peer)
-    context: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
+    context: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
 
     # Relationship
     device: Mapped["Device"] = relationship("Device", back_populates="metrics")

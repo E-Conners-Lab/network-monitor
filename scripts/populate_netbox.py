@@ -3,6 +3,7 @@
 
 import os
 import sys
+
 import pynetbox
 
 # NetBox connection
@@ -19,14 +20,14 @@ DEVICES = [
     {"name": "EUNIV-INET-GW1", "ip": "192.168.68.206", "role": "gateway", "loopback": "10.255.0.101"},
     {"name": "EUNIV-INET-GW2", "ip": "192.168.68.207", "role": "gateway", "loopback": "10.255.0.102"},
     {"name": "EUNIV-MAIN-AGG1", "ip": "192.168.68.208", "role": "aggregation", "loopback": "10.255.1.1"},
-    {"name": "EUNIV-MAIN-PE1", "ip": "192.168.68.209", "role": "pe", "loopback": "10.255.1.11"},
-    {"name": "EUNIV-MAIN-PE2", "ip": "192.168.68.210", "role": "pe", "loopback": "10.255.1.12"},
+    {"name": "EUNIV-MAIN-EDGE1", "ip": "192.168.68.209", "role": "edge", "loopback": "10.255.1.11"},
+    {"name": "EUNIV-MAIN-EDGE2", "ip": "192.168.68.210", "role": "edge", "loopback": "10.255.1.12"},
     {"name": "EUNIV-MED-AGG1", "ip": "192.168.68.211", "role": "aggregation", "loopback": "10.255.2.1"},
-    {"name": "EUNIV-MED-PE1", "ip": "192.168.68.212", "role": "pe", "loopback": "10.255.2.11"},
-    {"name": "EUNIV-MED-PE2", "ip": "192.168.68.213", "role": "pe", "loopback": "10.255.2.12"},
+    {"name": "EUNIV-MED-EDGE1", "ip": "192.168.68.212", "role": "edge", "loopback": "10.255.2.11"},
+    {"name": "EUNIV-MED-EDGE2", "ip": "192.168.68.213", "role": "edge", "loopback": "10.255.2.12"},
     {"name": "EUNIV-RES-AGG1", "ip": "192.168.68.214", "role": "aggregation", "loopback": "10.255.3.1"},
-    {"name": "EUNIV-RES-PE1", "ip": "192.168.68.215", "role": "pe", "loopback": "10.255.3.11"},
-    {"name": "EUNIV-RES-PE2", "ip": "192.168.68.216", "role": "pe", "loopback": "10.255.3.12"},
+    {"name": "EUNIV-RES-EDGE1", "ip": "192.168.68.215", "role": "edge", "loopback": "10.255.3.11"},
+    {"name": "EUNIV-RES-EDGE2", "ip": "192.168.68.216", "role": "edge", "loopback": "10.255.3.12"},
 ]
 
 
@@ -95,7 +96,7 @@ def main():
     # Step 4: Create device roles
     print("\n=== Setting up Device Roles ===")
     roles = {}
-    for role_slug in ["router", "core", "gateway", "aggregation", "pe"]:
+    for role_slug in ["router", "core", "gateway", "aggregation", "edge"]:
         role = nb.dcim.device_roles.get(slug=role_slug)
         if not role:
             role = nb.dcim.device_roles.create(
@@ -147,7 +148,7 @@ def main():
                     type="1000base-t",
                     description="Management Interface",
                 )
-                print(f"    Created interface: GigabitEthernet1")
+                print("    Created interface: GigabitEthernet1")
 
             # Create or get IP address
             ip = nb.ipam.ip_addresses.get(address=f"{device_info['ip']}/24")
@@ -178,7 +179,7 @@ def main():
             print(f"    ERROR setting up IP for {device_info['name']}: {e}")
 
     print(f"\n{'='*50}")
-    print(f"NetBox population complete!")
+    print("NetBox population complete!")
     print(f"  Created: {created} devices")
     print(f"  Updated: {updated} devices (IPs assigned)")
     print(f"  Total: {len(DEVICES)} devices")

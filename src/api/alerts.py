@@ -1,17 +1,16 @@
 """Alert API endpoints."""
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import get_db
-from src.models.alert import Alert, AlertSeverity, AlertStatus
-from src.schemas.alert import AlertCreate, AlertUpdate, AlertResponse
 from src.api.auth import get_current_user
+from src.models.alert import Alert, AlertSeverity, AlertStatus
+from src.models.base import get_db
 from src.models.user import User
+from src.schemas.alert import AlertCreate, AlertResponse, AlertUpdate
 
 router = APIRouter()
 
@@ -20,9 +19,9 @@ router = APIRouter()
 async def list_alerts(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    device_id: Optional[int] = None,
-    severity: Optional[AlertSeverity] = None,
-    status: Optional[AlertStatus] = None,
+    device_id: int | None = None,
+    severity: AlertSeverity | None = None,
+    status: AlertStatus | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -148,7 +147,7 @@ async def acknowledge_alert(
 @router.post("/{alert_id}/resolve", response_model=AlertResponse)
 async def resolve_alert(
     alert_id: int,
-    resolution_notes: Optional[str] = None,
+    resolution_notes: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

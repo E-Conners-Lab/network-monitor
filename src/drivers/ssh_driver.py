@@ -1,7 +1,6 @@
 """SSH driver using Netmiko for Cisco device communication."""
 
 import logging
-from typing import Optional
 
 from netmiko import ConnectHandler, NetmikoAuthenticationException, NetmikoTimeoutException
 from netmiko.exceptions import NetmikoBaseException
@@ -33,7 +32,7 @@ class SSHDriver(CommandDriver):
 
     def __init__(self, params: ConnectionParams):
         super().__init__(params)
-        self._connection: Optional[ConnectHandler] = None
+        self._connection: ConnectHandler | None = None
 
     def connect(self) -> DriverResult:
         """Establish SSH connection to the device."""

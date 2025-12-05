@@ -3,18 +3,17 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.tasks import celery_app
 from src.config import get_settings
-from src.models.device import Device, DeviceType
-from src.models.metric import Metric, MetricType
-from src.models.alert import Alert, AlertSeverity, AlertStatus
 from src.drivers import ConnectionParams, DevicePlatform, PyATSDriver
 from src.drivers.pyats_driver import extract_bgp_neighbor_states, extract_ospf_neighbor_states
+from src.models.alert import Alert, AlertSeverity, AlertStatus
+from src.models.device import Device, DeviceType
+from src.models.metric import Metric, MetricType
+from src.tasks import celery_app
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -47,9 +46,9 @@ async def store_metric(
     metric_type: MetricType,
     value: float,
     metric_name: str,
-    unit: Optional[str] = None,
-    context: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    unit: str | None = None,
+    context: str | None = None,
+    metadata: dict | None = None,
 ) -> Metric:
     """Store a metric in the database."""
     metric = Metric(
@@ -72,8 +71,8 @@ async def check_neighbor_alert(
     neighbor_type: str,  # "bgp" or "ospf"
     neighbor_id: str,
     state: str,
-    previous_state: Optional[str],
-) -> Optional[Alert]:
+    previous_state: str | None,
+) -> Alert | None:
     """Check for neighbor state changes and create alerts."""
     # Define "bad" states
     bgp_bad_states = ["idle", "active", "connect", "opensent", "openconfirm"]

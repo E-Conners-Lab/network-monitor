@@ -3,14 +3,13 @@
 import asyncio
 import logging
 import os
-from datetime import datetime
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.tasks import celery_app
 from src.config import get_settings
 from src.models.device import Device
+from src.tasks import celery_app
 
 logger = logging.getLogger(__name__)
 

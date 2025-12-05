@@ -1,26 +1,24 @@
 """Metrics API endpoints."""
 
 from datetime import datetime, timedelta
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, func, and_
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
 
+from src.api.auth import get_current_user
 from src.models.base import get_db
 from src.models.metric import Metric, MetricType
-from src.schemas.metric import MetricCreate, MetricResponse, MetricSummary
-from src.api.auth import get_current_user
 from src.models.user import User
+from src.schemas.metric import MetricCreate, MetricResponse, MetricSummary
 
 router = APIRouter()
 
 
 @router.get("", response_model=list[MetricResponse])
 async def list_metrics(
-    device_id: Optional[int] = None,
-    metric_type: Optional[MetricType] = None,
+    device_id: int | None = None,
+    metric_type: MetricType | None = None,
     hours: int = Query(24, ge=1, le=168),  # Max 1 week
     skip: int = Query(0, ge=0),
     limit: int = Query(1000, ge=1, le=10000),
@@ -149,7 +147,7 @@ async def get_metrics_history_batch(
 @router.get("/device/{device_id}", response_model=list[MetricResponse])
 async def get_device_metrics(
     device_id: int,
-    metric_type: Optional[MetricType] = None,
+    metric_type: MetricType | None = None,
     hours: int = Query(24, ge=1, le=168),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -305,7 +303,6 @@ async def get_device_routing_neighbors(
     current_user: User = Depends(get_current_user),
 ):
     """Get BGP and OSPF neighbor states for a device."""
-    from sqlalchemy.orm import selectinload
 
     # Get latest BGP neighbors
     bgp_subquery = (

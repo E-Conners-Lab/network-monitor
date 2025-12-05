@@ -1,7 +1,7 @@
 """SNMP driver for polling device metrics."""
 
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from pysnmp.hlapi import (
     CommunityData,
@@ -11,7 +11,6 @@ from pysnmp.hlapi import (
     SnmpEngine,
     UdpTransportTarget,
     getCmd,
-    bulkCmd,
     nextCmd,
 )
 from pysnmp.proto.rfc1902 import Integer, OctetString
@@ -79,9 +78,9 @@ class SNMPDriver(PollingDriver):
 
     def __init__(self, params: ConnectionParams):
         super().__init__(params)
-        self._engine: Optional[SnmpEngine] = None
-        self._community: Optional[CommunityData] = None
-        self._transport: Optional[UdpTransportTarget] = None
+        self._engine: SnmpEngine | None = None
+        self._community: CommunityData | None = None
+        self._transport: UdpTransportTarget | None = None
 
     def connect(self) -> DriverResult:
         """Initialize SNMP engine and transport."""

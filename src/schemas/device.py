@@ -1,9 +1,8 @@
 """Device schemas."""
 
 from datetime import datetime
-from typing import Optional
 
-from pydantic import BaseModel, IPvAnyAddress
+from pydantic import BaseModel
 
 from src.models.device import DeviceType
 
@@ -16,36 +15,36 @@ class DeviceCreate(BaseModel):
     ip_address: str
     device_type: DeviceType
     vendor: str = "cisco"
-    model: Optional[str] = None
-    os_version: Optional[str] = None
-    snmp_community: Optional[str] = None
+    model: str | None = None
+    os_version: str | None = None
+    snmp_community: str | None = None
     snmp_version: int = 2
     ssh_port: int = 22
     netconf_port: int = 830
-    netbox_id: Optional[int] = None
-    location: Optional[str] = None
-    description: Optional[str] = None
-    tags: Optional[dict] = None
+    netbox_id: int | None = None
+    location: str | None = None
+    description: str | None = None
+    tags: dict | None = None
 
 
 class DeviceUpdate(BaseModel):
     """Schema for updating a device."""
 
-    name: Optional[str] = None
-    hostname: Optional[str] = None
-    ip_address: Optional[str] = None
-    device_type: Optional[DeviceType] = None
-    vendor: Optional[str] = None
-    model: Optional[str] = None
-    os_version: Optional[str] = None
-    is_active: Optional[bool] = None
-    snmp_community: Optional[str] = None
-    snmp_version: Optional[int] = None
-    ssh_port: Optional[int] = None
-    netconf_port: Optional[int] = None
-    location: Optional[str] = None
-    description: Optional[str] = None
-    tags: Optional[dict] = None
+    name: str | None = None
+    hostname: str | None = None
+    ip_address: str | None = None
+    device_type: DeviceType | None = None
+    vendor: str | None = None
+    model: str | None = None
+    os_version: str | None = None
+    is_active: bool | None = None
+    snmp_community: str | None = None
+    snmp_version: int | None = None
+    ssh_port: int | None = None
+    netconf_port: int | None = None
+    location: str | None = None
+    description: str | None = None
+    tags: dict | None = None
 
 
 class DeviceResponse(BaseModel):
@@ -57,18 +56,18 @@ class DeviceResponse(BaseModel):
     ip_address: str
     device_type: DeviceType
     vendor: str
-    model: Optional[str]
-    os_version: Optional[str]
+    model: str | None
+    os_version: str | None
     is_active: bool
     is_reachable: bool
-    last_seen: Optional[str]
+    last_seen: str | None
     snmp_version: int
     ssh_port: int
     netconf_port: int
-    netbox_id: Optional[int]
-    location: Optional[str]
-    description: Optional[str]
-    tags: Optional[dict]
+    netbox_id: int | None
+    location: str | None
+    description: str | None
+    tags: dict | None
     created_at: datetime
     updated_at: datetime
 

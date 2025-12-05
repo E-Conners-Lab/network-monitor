@@ -1,9 +1,8 @@
 """Device model for network devices."""
 
 import enum
-from typing import Optional
 
-from sqlalchemy import String, Integer, Boolean, Enum, Text, JSON
+from sqlalchemy import JSON, Boolean, Enum, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
@@ -30,27 +29,27 @@ class Device(Base):
     ip_address: Mapped[str] = mapped_column(String(45), index=True)  # IPv6 max length
     device_type: Mapped[DeviceType] = mapped_column(Enum(DeviceType))
     vendor: Mapped[str] = mapped_column(String(50), default="cisco")
-    model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    os_version: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    os_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     # Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_reachable: Mapped[bool] = mapped_column(Boolean, default=False)
-    last_seen: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    last_seen: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
     # Connection settings
-    snmp_community: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    snmp_community: Mapped[str | None] = mapped_column(String(100), nullable=True)
     snmp_version: Mapped[int] = mapped_column(Integer, default=2)
     ssh_port: Mapped[int] = mapped_column(Integer, default=22)
     netconf_port: Mapped[int] = mapped_column(Integer, default=830)
 
     # NetBox integration
-    netbox_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    netbox_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
 
     # Additional data
-    location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    tags: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Relationships
     metrics: Mapped[list["Metric"]] = relationship(
@@ -71,6 +70,6 @@ class Device(Base):
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from src.models.metric import Metric
     from src.models.alert import Alert
+    from src.models.metric import Metric
     from src.models.remediation_log import RemediationLog

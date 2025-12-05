@@ -1,10 +1,9 @@
 """Remediation log model for tracking automated fixes."""
 
 import enum
-from typing import Optional
 from datetime import datetime
 
-from sqlalchemy import String, ForeignKey, Enum, Text, JSON, Integer
+from sqlalchemy import JSON, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
@@ -27,7 +26,7 @@ class RemediationLog(Base):
 
     # Foreign keys
     device_id: Mapped[int] = mapped_column(ForeignKey("devices.id"), index=True)
-    alert_id: Mapped[Optional[int]] = mapped_column(
+    alert_id: Mapped[int | None] = mapped_column(
         ForeignKey("alerts.id"), nullable=True, index=True
     )
 
@@ -39,18 +38,18 @@ class RemediationLog(Base):
     )
 
     # Execution details
-    started_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # State capture
-    state_before: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
-    state_after: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    state_before: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    state_after: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Commands and output
-    commands_executed: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
-    command_output: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    commands_executed: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    command_output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Retry tracking
     attempt_number: Mapped[int] = mapped_column(Integer, default=1)

@@ -1,7 +1,6 @@
 """Metric schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -15,9 +14,9 @@ class MetricCreate(BaseModel):
     metric_type: MetricType
     metric_name: str
     value: float
-    unit: Optional[str] = None
-    context: Optional[str] = None
-    metadata_: Optional[dict] = None
+    unit: str | None = None
+    context: str | None = None
+    metadata_: dict | None = None
 
 
 class MetricResponse(BaseModel):
@@ -28,9 +27,9 @@ class MetricResponse(BaseModel):
     metric_type: MetricType
     metric_name: str
     value: float
-    unit: Optional[str]
-    context: Optional[str]
-    metadata_: Optional[dict] = None
+    unit: str | None
+    context: str | None
+    metadata_: dict | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

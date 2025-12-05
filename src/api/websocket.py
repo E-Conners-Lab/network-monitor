@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-from typing import Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -13,7 +12,7 @@ class ConnectionManager:
     """Manage WebSocket connections."""
 
     def __init__(self):
-        self.active_connections: Set[WebSocket] = set()
+        self.active_connections: set[WebSocket] = set()
 
     async def connect(self, websocket: WebSocket):
         """Accept and track a new WebSocket connection."""
@@ -97,7 +96,7 @@ async def websocket_events(websocket: WebSocket):
                             "channel": message.get("channel"),
                         },
                     )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # Send keepalive ping
                 await manager.send_to_client(websocket, {"type": "ping"})
     except WebSocketDisconnect:

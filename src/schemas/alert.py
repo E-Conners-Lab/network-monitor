@@ -1,7 +1,6 @@
 """Alert schemas."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel
 
@@ -16,15 +15,15 @@ class AlertCreate(BaseModel):
     message: str
     severity: AlertSeverity
     alert_type: str
-    context: Optional[dict] = None
+    context: dict | None = None
 
 
 class AlertUpdate(BaseModel):
     """Schema for updating an alert."""
 
-    status: Optional[AlertStatus] = None
-    acknowledged_by: Optional[str] = None
-    resolution_notes: Optional[str] = None
+    status: AlertStatus | None = None
+    acknowledged_by: str | None = None
+    resolution_notes: str | None = None
 
 
 class AlertResponse(BaseModel):
@@ -37,13 +36,13 @@ class AlertResponse(BaseModel):
     severity: AlertSeverity
     status: AlertStatus
     alert_type: str
-    context: Optional[dict]
-    acknowledged_at: Optional[datetime]
-    acknowledged_by: Optional[str]
-    resolved_at: Optional[datetime]
-    resolution_notes: Optional[str]
+    context: dict | None
+    acknowledged_at: datetime | None
+    acknowledged_by: str | None
+    resolved_at: datetime | None
+    resolution_notes: str | None
     webhook_sent: bool
-    webhook_sent_at: Optional[datetime]
+    webhook_sent_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

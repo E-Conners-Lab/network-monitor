@@ -1,6 +1,6 @@
 """User model for authentication."""
 
-from sqlalchemy import String, Boolean
+from sqlalchemy import Boolean, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.models.base import Base

@@ -2,7 +2,6 @@
 
 import logging
 from dataclasses import dataclass
-from typing import Optional
 
 import pynetbox
 from pynetbox.core.response import Record
@@ -38,10 +37,10 @@ class NetBoxDevice:
     ip_address: str
     device_type: DeviceType
     vendor: str
-    model: Optional[str]
-    platform: Optional[str]
-    site: Optional[str]
-    location: Optional[str]
+    model: str | None
+    platform: str | None
+    site: str | None
+    location: str | None
     status: str
     tags: list[str]
 
@@ -139,7 +138,7 @@ class NetBoxClient:
             logger.error(f"Error fetching devices from NetBox: {e}")
             return []
 
-    def get_device(self, device_id: int) -> Optional[NetBoxDevice]:
+    def get_device(self, device_id: int) -> NetBoxDevice | None:
         """Get a single device by NetBox ID."""
         if not self.is_configured:
             return None
@@ -153,7 +152,7 @@ class NetBoxClient:
             logger.error(f"Error fetching device {device_id} from NetBox: {e}")
             return None
 
-    def get_device_by_name(self, name: str) -> Optional[NetBoxDevice]:
+    def get_device_by_name(self, name: str) -> NetBoxDevice | None:
         """Get a device by name."""
         if not self.is_configured:
             return None
@@ -167,7 +166,7 @@ class NetBoxClient:
             logger.error(f"Error fetching device '{name}' from NetBox: {e}")
             return None
 
-    def get_device_credentials(self, device_id: int) -> Optional[dict]:
+    def get_device_credentials(self, device_id: int) -> dict | None:
         """
         Get device credentials from NetBox secrets.
 
@@ -384,6 +383,7 @@ class NetBoxSyncService:
             Dict with sync results (created, updated, errors)
         """
         from sqlalchemy import select
+
         from src.models.device import Device
 
         if not self.client.is_configured:

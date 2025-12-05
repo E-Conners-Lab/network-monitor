@@ -3,10 +3,11 @@
 
 import asyncio
 import sys
+
 sys.path.insert(0, "/app")
 
-from sqlalchemy import select
 from passlib.context import CryptContext
+from sqlalchemy import select
 
 from src.models.base import AsyncSessionLocal
 from src.models.user import User

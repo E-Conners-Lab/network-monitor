@@ -1,7 +1,6 @@
 """pyATS/Genie driver for structured CLI parsing (BGP/OSPF monitoring)."""
 
 import logging
-from typing import Any, Optional
 
 from src.drivers.base import (
     CommandDriver,
@@ -44,8 +43,8 @@ class PyATSDriver(CommandDriver):
     def connect(self) -> DriverResult:
         """Establish connection to the device using pyATS/unicon."""
         try:
-            from pyats.topology import loader
             from genie.testbed import load as genie_load
+            from pyats.topology import loader
 
             platform_info = PLATFORM_MAP.get(
                 self.params.platform, {"os": "ios", "platform": "ios"}
@@ -194,9 +193,9 @@ class PyATSDriver(CommandDriver):
 
         try:
             from genie.libs.ops.bgp.bgp import Bgp
+            from genie.libs.ops.interface.interface import Interface
             from genie.libs.ops.ospf.ospf import Ospf
             from genie.libs.ops.routing.routing import Routing
-            from genie.libs.ops.interface.interface import Interface
 
             feature_map = {
                 "bgp": Bgp,
@@ -249,7 +248,7 @@ class PyATSDriver(CommandDriver):
         # Try learning full OSPF state
         return self.learn("ospf")
 
-    def get_routing_table(self, vrf: Optional[str] = None) -> DriverResult:
+    def get_routing_table(self, vrf: str | None = None) -> DriverResult:
         """Get the routing table.
 
         Args:

@@ -1,26 +1,25 @@
 """Remediation API endpoints."""
 
 from datetime import datetime
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.auth import get_current_user
+from src.models.alert import Alert, AlertStatus
 from src.models.base import get_db
 from src.models.device import Device
-from src.models.alert import Alert, AlertStatus
 from src.models.remediation_log import RemediationLog, RemediationStatus
-from src.api.auth import get_current_user
 from src.models.user import User
 from src.tasks.remediation import (
-    execute_remediation,
-    interface_enable,
+    auto_remediate_alert,
     clear_bgp_session,
     clear_device_caches,
+    execute_remediation,
+    interface_enable,
     send_webhook_alert,
-    auto_remediate_alert,
 )
 
 router = APIRouter()
@@ -31,7 +30,7 @@ class RemediationRequest(BaseModel):
     """Request to execute a remediation playbook."""
 
     playbook_name: str
-    alert_id: Optional[int] = None
+    alert_id: int | None = None
 
 
 class InterfaceEnableRequest(BaseModel):
@@ -59,15 +58,15 @@ class RemediationLogResponse(BaseModel):
 
     id: int
     device_id: int
-    alert_id: Optional[int]
+    alert_id: int | None
     playbook_name: str
     action_type: str
     status: RemediationStatus
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
-    duration_ms: Optional[int]
-    commands_executed: Optional[list]
-    error_message: Optional[str]
+    started_at: datetime | None
+    completed_at: datetime | None
+    duration_ms: int | None
+    commands_executed: list | None
+    error_message: str | None
     attempt_number: int
     created_at: datetime
 
@@ -100,8 +99,8 @@ async def list_playbooks(
 async def list_remediation_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    device_id: Optional[int] = None,
-    status: Optional[RemediationStatus] = None,
+    device_id: int | None = None,
+    status: RemediationStatus | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

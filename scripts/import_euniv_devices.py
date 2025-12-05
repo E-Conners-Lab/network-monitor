@@ -3,9 +3,11 @@
 
 import asyncio
 import sys
+
 sys.path.insert(0, "/app")
 
 from sqlalchemy import select
+
 from src.models.base import AsyncSessionLocal
 from src.models.device import Device, DeviceType
 
@@ -19,14 +21,14 @@ DEVICES = [
     {"name": "EUNIV-INET-GW1", "ip": "192.168.68.206", "role": "Internet Gateway", "loopback": "10.255.0.101"},
     {"name": "EUNIV-INET-GW2", "ip": "192.168.68.207", "role": "Internet Gateway", "loopback": "10.255.0.102"},
     {"name": "EUNIV-MAIN-AGG1", "ip": "192.168.68.208", "role": "Main Campus Aggregation", "loopback": "10.255.1.1"},
-    {"name": "EUNIV-MAIN-PE1", "ip": "192.168.68.209", "role": "Main Campus PE/BNG", "loopback": "10.255.1.11"},
-    {"name": "EUNIV-MAIN-PE2", "ip": "192.168.68.210", "role": "Main Campus PE/BNG", "loopback": "10.255.1.12"},
+    {"name": "EUNIV-MAIN-EDGE1", "ip": "192.168.68.209", "role": "Main Campus Edge", "loopback": "10.255.1.11"},
+    {"name": "EUNIV-MAIN-EDGE2", "ip": "192.168.68.210", "role": "Main Campus Edge", "loopback": "10.255.1.12"},
     {"name": "EUNIV-MED-AGG1", "ip": "192.168.68.211", "role": "Medical Campus Aggregation", "loopback": "10.255.2.1"},
-    {"name": "EUNIV-MED-PE1", "ip": "192.168.68.212", "role": "Medical Campus PE/BNG", "loopback": "10.255.2.11"},
-    {"name": "EUNIV-MED-PE2", "ip": "192.168.68.213", "role": "Medical Campus PE/BNG", "loopback": "10.255.2.12"},
+    {"name": "EUNIV-MED-EDGE1", "ip": "192.168.68.212", "role": "Medical Campus Edge", "loopback": "10.255.2.11"},
+    {"name": "EUNIV-MED-EDGE2", "ip": "192.168.68.213", "role": "Medical Campus Edge", "loopback": "10.255.2.12"},
     {"name": "EUNIV-RES-AGG1", "ip": "192.168.68.214", "role": "Research Campus Aggregation", "loopback": "10.255.3.1"},
-    {"name": "EUNIV-RES-PE1", "ip": "192.168.68.215", "role": "Research Campus PE/BNG", "loopback": "10.255.3.11"},
-    {"name": "EUNIV-RES-PE2", "ip": "192.168.68.216", "role": "Research Campus PE/BNG", "loopback": "10.255.3.12"},
+    {"name": "EUNIV-RES-EDGE1", "ip": "192.168.68.215", "role": "Research Campus Edge", "loopback": "10.255.3.11"},
+    {"name": "EUNIV-RES-EDGE2", "ip": "192.168.68.216", "role": "Research Campus Edge", "loopback": "10.255.3.12"},
 ]
 
 # SNMP settings
@@ -76,7 +78,7 @@ async def import_devices():
         await session.commit()
 
         print(f"\n{'='*50}")
-        print(f"Import complete!")
+        print("Import complete!")
         print(f"  Added: {added} devices")
         print(f"  Skipped: {skipped} devices (already existed)")
         print(f"  Total: {len(DEVICES)} devices")

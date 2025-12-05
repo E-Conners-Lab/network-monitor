@@ -6,8 +6,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src import __version__
+from src.api import alerts, auth, devices, metrics, remediation, tests, websocket
 from src.config import get_settings
-from src.api import devices, alerts, metrics, auth, websocket, remediation, tests
 
 
 @asynccontextmanager

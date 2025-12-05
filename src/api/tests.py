@@ -1,13 +1,12 @@
 """API endpoints for network validation tests."""
 
 from enum import Enum
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from src.api.auth import get_current_user
-from src.tasks.network_tests import run_network_test, run_device_test
+from src.tasks.network_tests import run_device_test, run_network_test
 
 router = APIRouter(prefix="/tests", tags=["tests"])
 
@@ -34,7 +33,7 @@ class TestResultResponse(BaseModel):
     """Test result response."""
     task_id: str
     status: str
-    result: Optional[dict] = None
+    result: dict | None = None
 
 
 @router.post("/run", response_model=TestResponse)

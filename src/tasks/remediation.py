@@ -3,19 +3,18 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.tasks import celery_app
 from src.config import get_settings
-from src.models.device import Device, DeviceType
-from src.models.alert import Alert, AlertStatus
-from src.models.remediation_log import RemediationLog, RemediationStatus
 from src.drivers import ConnectionParams, DevicePlatform, SSHDriver
 from src.integrations.netbox import NetBoxClient
+from src.models.alert import Alert, AlertStatus
+from src.models.device import Device, DeviceType
+from src.models.remediation_log import RemediationLog, RemediationStatus
+from src.tasks import celery_app
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -70,7 +69,7 @@ def get_device_credentials(device: Device) -> dict:
     return credentials
 
 
-def get_ssh_driver(device: Device, credentials: dict) -> Optional[SSHDriver]:
+def get_ssh_driver(device: Device, credentials: dict) -> SSHDriver | None:
     """Create an SSH driver for a device."""
     if not credentials.get("username") or not credentials.get("password"):
         logger.error(f"No credentials available for device {device.name}")
@@ -101,7 +100,7 @@ async def create_remediation_log(
     device_id: int,
     playbook_name: str,
     action_type: str,
-    alert_id: Optional[int] = None,
+    alert_id: int | None = None,
 ) -> RemediationLog:
     """Create a remediation log entry."""
     log = RemediationLog(

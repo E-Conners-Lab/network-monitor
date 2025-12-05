@@ -1,7 +1,6 @@
 """User schemas for authentication."""
 
 from datetime import datetime
-from typing import Optional
 
 from pydantic import BaseModel, EmailStr
 
@@ -45,5 +44,5 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     """Schema for decoded token data."""
 
-    username: Optional[str] = None
-    user_id: Optional[int] = None
+    username: str | None = None
+    user_id: int | None = None

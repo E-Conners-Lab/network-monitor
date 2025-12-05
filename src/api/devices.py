@@ -1,21 +1,20 @@
 """Device API endpoints."""
 
 from datetime import datetime
-from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import get_db
-from src.models.device import Device, DeviceType
-from src.schemas.device import DeviceCreate, DeviceUpdate, DeviceResponse
 from src.api.auth import get_current_user
-from src.models.user import User
-from src.core.health_checks import check_device_connectivity, HealthCheckService
+from src.core.health_checks import check_device_connectivity
 from src.drivers.base import DevicePlatform
 from src.integrations.netbox import NetBoxClient, NetBoxSyncService
+from src.models.base import get_db
+from src.models.device import Device, DeviceType
+from src.models.user import User
+from src.schemas.device import DeviceCreate, DeviceResponse, DeviceUpdate
 from src.tasks.polling import poll_all_devices
 
 router = APIRouter()
@@ -25,9 +24,9 @@ router = APIRouter()
 class ConnectivityCheckRequest(BaseModel):
     """Request body for connectivity check with credentials."""
 
-    username: Optional[str] = None
-    password: Optional[str] = None
-    enable_password: Optional[str] = None
+    username: str | None = None
+    password: str | None = None
+    enable_password: str | None = None
     snmp_community: str = "public"
     check_ping: bool = True
     check_snmp: bool = True
@@ -41,9 +40,9 @@ class ConnectivityCheckResponse(BaseModel):
     device_name: str
     ip_address: str
     timestamp: datetime
-    ping: Optional[dict] = None
-    snmp: Optional[dict] = None
-    ssh: Optional[dict] = None
+    ping: dict | None = None
+    snmp: dict | None = None
+    ssh: dict | None = None
     overall_reachable: bool
 
 
@@ -51,8 +50,8 @@ class ConnectivityCheckResponse(BaseModel):
 async def list_devices(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    device_type: Optional[DeviceType] = None,
-    is_active: Optional[bool] = None,
+    device_type: DeviceType | None = None,
+    is_active: bool | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -263,7 +262,7 @@ async def netbox_status(
 
 @router.post("/netbox/sync")
 async def sync_from_netbox(
-    site: Optional[str] = Query(None, description="Filter devices by NetBox site"),
+    site: str | None = Query(None, description="Filter devices by NetBox site"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -280,8 +279,8 @@ async def sync_from_netbox(
 
 @router.get("/netbox/devices")
 async def list_netbox_devices(
-    site: Optional[str] = Query(None, description="Filter by site"),
-    role: Optional[str] = Query(None, description="Filter by role"),
+    site: str | None = Query(None, description="Filter by site"),
+    role: str | None = Query(None, description="Filter by role"),
     current_user: User = Depends(get_current_user),
 ):
     """List devices from NetBox (preview before sync)."""
@@ -331,7 +330,7 @@ async def collect_os_versions(
     This connects to each device, runs 'show version', and parses the OS version.
     The os_version field is updated for each device.
     """
-    from src.core.health_checks import check_ssh, parse_os_version
+    from src.core.health_checks import check_ssh
 
     result = await db.execute(select(Device).where(Device.is_active == True))
     devices = result.scalars().all()

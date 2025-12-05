@@ -1,7 +1,6 @@
 """NETCONF driver for IOS-XE devices."""
 
 import logging
-from typing import Optional
 from xml.etree import ElementTree as ET
 
 from ncclient import manager
@@ -11,7 +10,6 @@ from ncclient.transport.errors import AuthenticationError, SSHError
 from src.drivers.base import (
     CommandDriver,
     ConnectionParams,
-    DevicePlatform,
     DriverResult,
     DriverType,
 )
@@ -80,7 +78,7 @@ class NetconfDriver(CommandDriver):
 
     def __init__(self, params: ConnectionParams):
         super().__init__(params)
-        self._connection: Optional[manager.Manager] = None
+        self._connection: manager.Manager | None = None
 
     def connect(self) -> DriverResult:
         """Establish NETCONF connection to the device."""

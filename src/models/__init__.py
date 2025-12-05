@@ -1,11 +1,11 @@
 """Database models."""
 
+from src.models.alert import Alert, AlertSeverity, AlertStatus
 from src.models.base import Base
-from src.models.user import User
 from src.models.device import Device, DeviceType
 from src.models.metric import Metric, MetricType
-from src.models.alert import Alert, AlertSeverity, AlertStatus
 from src.models.remediation_log import RemediationLog, RemediationStatus
+from src.models.user import User
 
 __all__ = [
     "Base",

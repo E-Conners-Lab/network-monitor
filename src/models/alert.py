@@ -1,10 +1,9 @@
 """Alert model for device alerts."""
 
 import enum
-from typing import Optional
 from datetime import datetime
 
-from sqlalchemy import String, ForeignKey, Enum, Text, JSON, Index
+from sqlalchemy import JSON, Enum, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.models.base import Base
@@ -42,17 +41,17 @@ class Alert(Base):
 
     # Context
     alert_type: Mapped[str] = mapped_column(String(50))  # e.g., "high_cpu", "interface_down"
-    context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    context: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     # Resolution
-    acknowledged_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    acknowledged_by: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    resolved_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
-    resolution_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    acknowledged_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    acknowledged_by: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    resolution_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Notification tracking
     webhook_sent: Mapped[bool] = mapped_column(default=False)
-    webhook_sent_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+    webhook_sent_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
     # Relationship
     device: Mapped["Device"] = relationship("Device", back_populates="alerts")

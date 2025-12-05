@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class DriverType(Enum):
@@ -30,17 +30,17 @@ class ConnectionParams:
     """Parameters for connecting to a device."""
 
     host: str
-    username: Optional[str] = None
-    password: Optional[str] = None
-    port: Optional[int] = None
+    username: str | None = None
+    password: str | None = None
+    port: int | None = None
     timeout: int = 30
 
     # SSH specific
-    enable_password: Optional[str] = None
-    ssh_key: Optional[str] = None
+    enable_password: str | None = None
+    ssh_key: str | None = None
 
     # SNMP specific
-    snmp_community: Optional[str] = None
+    snmp_community: str | None = None
     snmp_version: int = 2
 
     # Platform for driver selection
@@ -52,9 +52,9 @@ class DriverResult:
     """Result from a driver operation."""
 
     success: bool
-    data: Optional[Any] = None
-    error: Optional[str] = None
-    raw_output: Optional[str] = None
+    data: Any | None = None
+    error: str | None = None
+    raw_output: str | None = None
 
 
 class BaseDriver(ABC):

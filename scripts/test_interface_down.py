@@ -18,6 +18,7 @@ import argparse
 import sys
 import time
 
+
 def main():
     parser = argparse.ArgumentParser(description='Test interface down scenario')
     parser.add_argument('--device', default='192.168.68.202', help='Device IP (default: CORE2)')

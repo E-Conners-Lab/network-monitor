@@ -1,7 +1,6 @@
 """Authentication API endpoints and utilities."""
 
 from datetime import datetime, timedelta
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -13,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import get_settings
 from src.models.base import get_db
 from src.models.user import User
-from src.schemas.user import UserCreate, UserResponse, Token, TokenData
+from src.schemas.user import Token, UserCreate, UserResponse
 
 router = APIRouter()
 settings = get_settings()
@@ -35,7 +34,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token."""
     to_encode = data.copy()
     expire = datetime.utcnow() + (

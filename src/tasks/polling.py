@@ -3,19 +3,18 @@
 import asyncio
 import logging
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from src.tasks import celery_app
 from src.config import get_settings
+from src.core.health_checks import ping_host
+from src.drivers import ConnectionParams, DevicePlatform, SNMPDriver
+from src.integrations.netbox import NetBoxSyncService
+from src.models.alert import Alert, AlertSeverity, AlertStatus
 from src.models.device import Device, DeviceType
 from src.models.metric import Metric, MetricType
-from src.models.alert import Alert, AlertSeverity, AlertStatus
-from src.drivers import ConnectionParams, DevicePlatform, SNMPDriver
-from src.core.health_checks import ping_host
-from src.integrations.netbox import NetBoxSyncService
+from src.tasks import celery_app
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -74,9 +73,9 @@ async def store_metric(
     metric_type: MetricType,
     value: float,
     metric_name: str,
-    unit: Optional[str] = None,
-    context: Optional[str] = None,
-    metadata: Optional[dict] = None,
+    unit: str | None = None,
+    context: str | None = None,
+    metadata: dict | None = None,
 ) -> Metric:
     """Store a metric in the database."""
     metric = Metric(
@@ -98,7 +97,7 @@ async def get_previous_metric(
     device_id: int,
     metric_type: MetricType,
     context: str,
-) -> Optional[Metric]:
+) -> Metric | None:
     """Get the most recent previous metric for rate calculation."""
     stmt = (
         select(Metric)
@@ -119,7 +118,7 @@ def calculate_rate_bps(
     previous_octets: float,
     current_time: datetime,
     previous_time: datetime,
-) -> Optional[float]:
+) -> float | None:
     """Calculate traffic rate in bits per second from octet counter delta.
 
     Handles 32-bit counter wraps (max 4,294,967,295 bytes).
@@ -155,7 +154,7 @@ async def check_interface_down_alert(
     status: str,
     device_name: str,
     admin_status: str = "up",
-) -> Optional[Alert]:
+) -> Alert | None:
     """Check if interface is down and create/resolve alert accordingly.
 
     Only creates alerts for non-management interfaces that go down.
@@ -238,8 +237,8 @@ async def check_and_create_alert(
     device_id: int,
     metric_type: MetricType,
     value: float,
-    context: Optional[str] = None,
-) -> Optional[Alert]:
+    context: str | None = None,
+) -> Alert | None:
     """Check if metric exceeds thresholds and create alert if needed."""
     thresholds = ALERT_THRESHOLDS.get(metric_type)
     if not thresholds:
