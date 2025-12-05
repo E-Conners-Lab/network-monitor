@@ -90,24 +90,7 @@ async def get_latest_backup(
     return backup
 
 
-@router.get("/{backup_id}", response_model=ConfigBackupDetail)
-async def get_config_backup(
-    backup_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Get a specific config backup by ID (includes full config text)."""
-    result = await db.execute(
-        select(ConfigBackup).where(ConfigBackup.id == backup_id)
-    )
-    backup = result.scalar_one_or_none()
-
-    if not backup:
-        raise HTTPException(status_code=404, detail="Config backup not found")
-
-    return backup
-
-
+# NOTE: This route MUST come BEFORE /{backup_id} to avoid matching issues
 @router.get("/diff/{backup_id_1}/{backup_id_2}", response_model=ConfigDiffResponse)
 async def compare_configs(
     backup_id_1: int,
@@ -224,6 +207,25 @@ async def trigger_backup(
         message=f"Backup triggered for {len(devices)} devices",
         device_count=len(devices),
     )
+
+
+# NOTE: This route MUST come AFTER more specific routes like /diff/...
+@router.get("/{backup_id}", response_model=ConfigBackupDetail)
+async def get_config_backup(
+    backup_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a specific config backup by ID (includes full config text)."""
+    result = await db.execute(
+        select(ConfigBackup).where(ConfigBackup.id == backup_id)
+    )
+    backup = result.scalar_one_or_none()
+
+    if not backup:
+        raise HTTPException(status_code=404, detail="Config backup not found")
+
+    return backup
 
 
 @router.delete("/{backup_id}")

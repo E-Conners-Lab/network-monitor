@@ -167,6 +167,20 @@ export const tests = {
   getStatus: (taskId) => api.get(`/tests/status/${taskId}`),
 };
 
+// Config Backups
+export const configs = {
+  list: (params) => api.get('/configs', { params }),
+  listDevice: (deviceId, limit = 20) => api.get(`/configs/device/${deviceId}`, { params: { limit } }),
+  getLatest: (deviceId) => api.get(`/configs/device/${deviceId}/latest`),
+  get: (id) => api.get(`/configs/${id}`),
+  diff: (id1, id2) => api.get(`/configs/diff/${id1}/${id2}`),
+  backup: (deviceIds, triggeredBy = 'manual') =>
+    api.post('/configs/backup', { device_ids: deviceIds, triggered_by: triggeredBy }),
+  backupAll: (triggeredBy = 'manual') =>
+    api.post('/configs/backup', { triggered_by: triggeredBy }),
+  delete: (id) => api.delete(`/configs/${id}`),
+};
+
 // System
 export const system = {
   version: () => api.get('/version'),

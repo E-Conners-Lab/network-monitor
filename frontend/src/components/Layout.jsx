@@ -8,6 +8,7 @@ import {
   Network,
   Wrench,
   FlaskConical,
+  FileText,
   LogOut,
   Wifi,
   WifiOff
@@ -22,6 +23,7 @@ const navItems = [
   { path: '/topology', label: 'Topology', icon: Network },
   { path: '/remediation', label: 'Remediation', icon: Wrench },
   { path: '/tests', label: 'Tests', icon: FlaskConical },
+  { path: '/configs', label: 'Configs', icon: FileText },
 ];
 
 export default function Layout({ children, isConnected, onLogout }) {

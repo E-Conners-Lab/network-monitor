@@ -9,6 +9,7 @@ import Metrics from './pages/Metrics';
 import Topology from './pages/Topology';
 import Remediation from './pages/Remediation';
 import Tests from './pages/Tests';
+import Configs from './pages/Configs';
 import Login from './pages/Login';
 import { auth } from './services/api';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -100,6 +101,7 @@ function App() {
                 <Route path="/topology" element={<Topology />} />
                 <Route path="/remediation" element={<Remediation />} />
                 <Route path="/tests" element={<Tests />} />
+                <Route path="/configs" element={<Configs />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

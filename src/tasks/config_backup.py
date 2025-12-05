@@ -1,12 +1,12 @@
 """Config backup Celery tasks."""
 
-import asyncio
+import hashlib
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from netmiko import ConnectHandler
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy import create_engine, select, and_
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.config import get_settings
 from src.models.config_backup import ConfigBackup
@@ -16,44 +16,41 @@ from src.tasks import celery_app
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# Singleton engine and session factory
-_async_engine = None
-_async_session_factory = None
+# Sync database engine for Celery tasks
+_sync_engine = None
+_sync_session_factory = None
 
 
-def get_async_engine():
-    """Get singleton async database engine."""
-    global _async_engine
-    if _async_engine is None:
-        _async_engine = create_async_engine(
-            settings.database_url,
+def get_sync_engine():
+    """Get singleton sync database engine."""
+    global _sync_engine
+    if _sync_engine is None:
+        # Convert async URL to sync (postgresql+asyncpg -> postgresql+psycopg2)
+        sync_url = settings.database_url.replace("+asyncpg", "+psycopg2")
+        _sync_engine = create_engine(
+            sync_url,
             echo=False,
             pool_pre_ping=True,
             pool_size=5,
             max_overflow=10,
         )
-    return _async_engine
+    return _sync_engine
 
 
-def get_async_session():
-    """Get singleton async session factory."""
-    global _async_session_factory
-    if _async_session_factory is None:
-        engine = get_async_engine()
-        _async_session_factory = async_sessionmaker(
-            engine, class_=AsyncSession, expire_on_commit=False
+def get_sync_session():
+    """Get singleton sync session factory."""
+    global _sync_session_factory
+    if _sync_session_factory is None:
+        engine = get_sync_engine()
+        _sync_session_factory = sessionmaker(
+            engine, class_=Session, expire_on_commit=False
         )
-    return _async_session_factory
+    return _sync_session_factory
 
 
-def run_async(coro):
-    """Run async coroutine in sync context."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+def compute_config_hash(config_text: str) -> str:
+    """Compute SHA-256 hash of config text."""
+    return hashlib.sha256(config_text.encode()).hexdigest()
 
 
 def collect_config_netmiko(
@@ -95,27 +92,29 @@ def collect_config_netmiko(
         return (device_name, None, str(e))
 
 
-async def save_config_backup(
-    db: AsyncSession,
+def save_config_backup(
+    db: Session,
     device_id: int,
     config_text: str,
     config_type: str,
     triggered_by: str,
-) -> ConfigBackup:
+) -> ConfigBackup | None:
     """Save a config backup to the database."""
-    config_hash = ConfigBackup.compute_hash(config_text)
+    config_hash = compute_config_hash(config_text)
     config_size = len(config_text.encode())
     line_count = config_text.count("\n") + 1
 
     # Check if this exact config already exists (by hash)
-    existing = await db.execute(
+    existing = db.execute(
         select(ConfigBackup).where(
-            ConfigBackup.device_id == device_id,
-            ConfigBackup.config_hash == config_hash,
+            and_(
+                ConfigBackup.device_id == device_id,
+                ConfigBackup.config_hash == config_hash,
+            )
         ).limit(1)
-    )
+    ).scalar_one_or_none()
 
-    if existing.scalar_one_or_none():
+    if existing:
         logger.info(f"Config unchanged for device {device_id} (hash: {config_hash[:8]}...)")
         return None
 
@@ -131,8 +130,8 @@ async def save_config_backup(
     )
 
     db.add(backup)
-    await db.commit()
-    await db.refresh(backup)
+    db.commit()
+    db.refresh(backup)
 
     logger.info(f"Saved config backup {backup.id} for device {device_id}")
     return backup
@@ -152,67 +151,69 @@ def backup_device_configs(
     """
     logger.info(f"Starting config backup for {len(device_ids)} devices")
 
-    async def _backup():
-        session_factory = get_async_session()
-        async with session_factory() as db:
-            # Get devices
-            result = await db.execute(
-                select(Device).where(
+    session_factory = get_sync_session()
+
+    with session_factory() as db:
+        # Get devices
+        result = db.execute(
+            select(Device).where(
+                and_(
                     Device.id.in_(device_ids),
                     Device.is_active == True,  # noqa: E712
                     Device.is_reachable == True,  # noqa: E712
                 )
             )
-            devices = result.scalars().all()
+        )
+        devices = result.scalars().all()
 
-            if not devices:
-                logger.warning("No reachable devices found for backup")
-                return {"success": 0, "failed": 0, "unchanged": 0}
+        if not devices:
+            logger.warning("No reachable devices found for backup")
+            return {"success": 0, "failed": 0, "unchanged": 0}
 
-            # Get SSH credentials from settings or tags
-            username = settings.ssh_username
-            password = settings.ssh_password
+        # Get SSH credentials from settings
+        username = settings.ssh_username
+        password = settings.ssh_password
 
-            # Collect configs in parallel using ThreadPoolExecutor
-            results = {"success": 0, "failed": 0, "unchanged": 0}
-            device_map = {d.name: d for d in devices}
+        # Collect configs in parallel using ThreadPoolExecutor
+        results = {"success": 0, "failed": 0, "unchanged": 0}
+        collected_configs = []
 
-            with ThreadPoolExecutor(max_workers=5) as executor:
-                futures = {
-                    executor.submit(
-                        collect_config_netmiko,
-                        device.name,
-                        device.ip_address,
-                        # Use device-specific creds from tags if available
-                        device.tags.get("ssh_username", username) if device.tags else username,
-                        device.tags.get("ssh_password", password) if device.tags else password,
-                        config_type,
-                    ): device
-                    for device in devices
-                }
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(
+                    collect_config_netmiko,
+                    device.name,
+                    device.ip_address,
+                    # Use device-specific creds from tags if available
+                    device.tags.get("ssh_username", username) if device.tags else username,
+                    device.tags.get("ssh_password", password) if device.tags else password,
+                    config_type,
+                ): device
+                for device in devices
+            }
 
-                for future in as_completed(futures):
-                    device = futures[future]
-                    device_name, config_text, error = future.result()
+            for future in as_completed(futures):
+                device = futures[future]
+                device_name, config_text, error = future.result()
 
-                    if error:
-                        logger.error(f"Backup failed for {device_name}: {error}")
-                        results["failed"] += 1
-                    elif config_text:
-                        # Save to database
-                        backup = await save_config_backup(
-                            db, device.id, config_text, config_type, triggered_by
-                        )
-                        if backup:
-                            results["success"] += 1
-                        else:
-                            results["unchanged"] += 1
+                if error:
+                    logger.error(f"Backup failed for {device_name}: {error}")
+                    results["failed"] += 1
+                elif config_text:
+                    collected_configs.append((device.id, config_text))
 
-            return results
+        # Save configs to database (after ThreadPoolExecutor completes)
+        for device_id, config_text in collected_configs:
+            backup = save_config_backup(
+                db, device_id, config_text, config_type, triggered_by
+            )
+            if backup:
+                results["success"] += 1
+            else:
+                results["unchanged"] += 1
 
-    result = run_async(_backup())
-    logger.info(f"Config backup complete: {result}")
-    return result
+    logger.info(f"Config backup complete: {results}")
+    return results
 
 
 @celery_app.task(name="tasks.scheduled_config_backup")
@@ -220,17 +221,15 @@ def scheduled_config_backup():
     """Scheduled task to backup all active device configs."""
     logger.info("Running scheduled config backup")
 
-    async def _get_device_ids():
-        session_factory = get_async_session()
-        async with session_factory() as db:
-            result = await db.execute(
-                select(Device.id).where(
-                    Device.is_active == True,  # noqa: E712
-                )
-            )
-            return [row[0] for row in result.fetchall()]
+    session_factory = get_sync_session()
 
-    device_ids = run_async(_get_device_ids())
+    with session_factory() as db:
+        result = db.execute(
+            select(Device.id).where(
+                Device.is_active == True,  # noqa: E712
+            )
+        )
+        device_ids = [row[0] for row in result.fetchall()]
 
     if device_ids:
         return backup_device_configs.delay(
